@@ -31,6 +31,10 @@ You can dig JSON data incrementally.
 
 You input `.bb.aaa[2]` and you can see below
 
+## Keymaps
+
+`Ctrl+K` : Change, View mode whole json or keys (only object)
+
 ```
 [Filter]> .bb.aaa[2]
 [

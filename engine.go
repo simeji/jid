@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -24,19 +25,21 @@ var (
 )
 
 type Engine struct {
-	json    *simplejson.Json
-	orgJson *simplejson.Json
-	query   bool
-	pretty  bool
+	json       *simplejson.Json
+	orgJson    *simplejson.Json
+	currenKeys []string
+	query      bool
+	pretty     bool
 }
 
 func NewEngine(s *os.File, q bool, p bool) *Engine {
 	j := parse(s)
 	e := &Engine{
-		json:    j,
-		orgJson: j,
-		query:   q,
-		pretty:  p,
+		json:       j,
+		orgJson:    j,
+		currenKeys: []string{},
+		query:      q,
+		pretty:     p,
 	}
 	return e
 }
@@ -92,25 +95,32 @@ func (e *Engine) render(json *simplejson.Json) bool {
 	f = &[]rune{}
 
 	contents := e.prettyContents()
+	keymode := false
 
 	for {
-		e.json = e.filterByQuery(string(*f))
-		contents = e.prettyContents()
+		e.filterByQuery(string(*f))
+		if keymode {
+			contents = e.currenKeys
+		} else {
+			contents = e.prettyContents()
+		}
 		draw(contents)
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
-			case termbox.KeySpace:
-				*f = append(*f, rune(' '))
-				draw(contents)
 			case termbox.KeyEsc, termbox.KeyCtrlC:
 				return false
+			case termbox.KeyCtrlK:
+				keymode = !keymode
+			case termbox.KeySpace:
+				*f = append(*f, rune(' '))
+			case termbox.KeyCtrlW:
+				//delete whole word to period
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				if i := len(*f) - 1; i >= 0 {
 					slice := *f
 					*f = slice[0:i]
 				}
-				//draw(contents)
 			case termbox.KeyEnter:
 				return true
 			case 0:
@@ -130,13 +140,14 @@ func (e *Engine) prettyContents() []string {
 	return strings.Split(string(s), "\n")
 }
 
-func (e *Engine) filterByQuery(q string) *simplejson.Json {
+func (e *Engine) filterByQuery(q string) {
 	json := e.orgJson
 	if len(q) > 0 {
 		keywords := strings.Split(q, ".")
 
 		if keywords[0] != "" {
-			return json
+			e.json = json
+			return
 		}
 		keywords = keywords[1:]
 
@@ -189,7 +200,18 @@ func (e *Engine) filterByQuery(q string) *simplejson.Json {
 			json = j
 		}
 	}
-	return json
+	//set key
+	m, err := json.Map()
+	if err != nil {
+		// is array
+	}
+	keys := []string{}
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	e.currenKeys = keys
+	e.json = json
 }
 
 func isEmptyJson(j *simplejson.Json) bool {
