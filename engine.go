@@ -24,19 +24,21 @@ var (
 )
 
 type Engine struct {
-	json    *simplejson.Json
-	orgJson *simplejson.Json
-	query   bool
-	pretty  bool
+	json       *simplejson.Json
+	orgJson    *simplejson.Json
+	prettyJson []string
+	query      bool
+	pretty     bool
 }
 
 func NewEngine(s *os.File, q bool, p bool) *Engine {
 	j := parse(s)
 	e := &Engine{
-		json:    j,
-		orgJson: j,
-		query:   q,
-		pretty:  p,
+		json:       j,
+		orgJson:    j,
+		prettyJson: []string{},
+		query:      q,
+		pretty:     p,
 	}
 	return e
 }
@@ -94,27 +96,38 @@ func (e *Engine) render(json *simplejson.Json) bool {
 	contents := e.prettyContents()
 
 	for {
-		e.json = e.filterByQuery(string(*f))
-		contents = e.prettyContents()
 		draw(contents)
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
-			case termbox.KeySpace:
-				*f = append(*f, rune(' '))
-				draw(contents)
 			case termbox.KeyEsc, termbox.KeyCtrlC:
 				return false
+			case termbox.KeyCtrlK:
+				m, err := e.json.Map()
+				if err != nil {
+					return false
+				}
+				c := []string{}
+				for k := range m {
+					c = append(c, k)
+				}
+				contents = c
+			case termbox.KeySpace:
+				*f = append(*f, rune(' '))
+				contents = e.prettyContents()
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				if i := len(*f) - 1; i >= 0 {
 					slice := *f
 					*f = slice[0:i]
 				}
-				//draw(contents)
+				e.json = e.filterByQuery(string(*f))
+				contents = e.prettyContents()
 			case termbox.KeyEnter:
 				return true
 			case 0:
 				*f = append(*f, rune(ev.Ch))
+				e.json = e.filterByQuery(string(*f))
+				contents = e.prettyContents()
 			default:
 			}
 		case termbox.EventError:
