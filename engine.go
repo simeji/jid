@@ -98,7 +98,7 @@ func (e *Engine) render(json *simplejson.Json) bool {
 	keymode := false
 
 	for {
-		e.filterByQuery(string(*f))
+		e.filterJson(string(*f))
 		if keymode {
 			contents = e.currenKeys
 		} else {
@@ -116,6 +116,12 @@ func (e *Engine) render(json *simplejson.Json) bool {
 				*f = append(*f, rune(' '))
 			case termbox.KeyCtrlW:
 				//delete whole word to period
+				s := string(*f)
+				kws := strings.Split(s, ".")
+				lki := len(kws) - 1
+				_, kws = kws[lki], kws[:lki]
+				s = strings.Join(kws, ".")
+				*f = ([]rune(s[0:len(s)]))
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				if i := len(*f) - 1; i >= 0 {
 					slice := *f
@@ -125,6 +131,24 @@ func (e *Engine) render(json *simplejson.Json) bool {
 				return true
 			case 0:
 				*f = append(*f, rune(ev.Ch))
+				s := string(*f)
+				kws := strings.Split(s, ".")
+				lki := len(kws) - 1
+				lkw, kws := kws[lki], kws[:lki]
+
+				// keyword search
+				var c []int
+				re, _ := regexp.Compile("(?i)^" + lkw + ".+")
+				for i, k := range e.currenKeys {
+					if str := re.FindString(k); str != "" {
+						c = append(c, i)
+					}
+				}
+				if len(c) == 1 {
+					kws = append(kws, e.currenKeys[c[0]])
+					s = strings.Join(kws, ".")
+					*f = ([]rune(s[0:len(s)]))
+				}
 			default:
 			}
 		case termbox.EventError:
@@ -140,7 +164,7 @@ func (e *Engine) prettyContents() []string {
 	return strings.Split(string(s), "\n")
 }
 
-func (e *Engine) filterByQuery(q string) {
+func (e *Engine) filterJson(q string) {
 	json := e.orgJson
 	if len(q) > 0 {
 		keywords := strings.Split(q, ".")
@@ -153,55 +177,54 @@ func (e *Engine) filterByQuery(q string) {
 
 		j := json
 
-		re := regexp.MustCompile("\\[[0-9]+\\]")
+		re := regexp.MustCompile("\\[[0-9]*\\]")
 		delre := regexp.MustCompile("\\[([0-9]+)?")
 
-		for _, keyword := range keywords {
+		lastIdx := len(keywords) - 1
+		//eachFlg := false
+		for ki, keyword := range keywords {
 			if len(keyword) == 0 {
 				break
 			}
 
-			if keyword[:1] == "[" {
-				matchIndexes := re.FindAllStringIndex(keyword, -1)
-				for _, m := range matchIndexes {
-					idx, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
-					if tj := j.GetIndex(idx); !isEmptyJson(tj) {
-						j = tj
-					}
-				}
-				kw := re.ReplaceAllString(keyword, "")
-				if tj := j.Get(kw); !isEmptyJson(tj) {
-					j = tj
-				}
-			} else if keyword[len(keyword)-1:] == "]" {
+			// abc[0]
+			if keyword[len(keyword)-1:] == "]" {
 				matchIndexes := re.FindAllStringIndex(keyword, -1)
 				kw := re.ReplaceAllString(keyword, "")
-				if tj := j.Get(kw); !isEmptyJson(tj) {
+
+				tj := j.Get(kw)
+				if ki != lastIdx {
+					j = tj
+				} else if !isEmptyJson(tj) {
 					j = tj
 				}
-				for _, m := range matchIndexes {
-					idx, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
-					if tj := j.GetIndex(idx); !isEmptyJson(tj) {
+				lmi := len(matchIndexes) - 1
+				for idx, m := range matchIndexes {
+					i, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
+					if idx == lmi && m[1]-m[0] == 2 {
+						//eachFlg = true
+					} else if tj := j.GetIndex(i); !isEmptyJson(tj) {
 						j = tj
 					}
 				}
 			} else {
 				kw := delre.ReplaceAllString(keyword, "")
-				if tj := j.Get(kw); !isEmptyJson(tj) {
+				tj := j.Get(kw)
+				if ki != lastIdx {
+					j = tj
+				} else if !isEmptyJson(tj) {
 					j = tj
 				}
 			}
 		}
-
-		switch j.Interface().(type) {
-		case nil:
-			json = e.orgJson
-		default:
-			json = j
-		}
+		json = j
 	}
-	//set key
-	m, err := json.Map()
+	e.json = json
+	e.setCurrentKeys()
+}
+
+func (e *Engine) setCurrentKeys() {
+	m, err := e.json.Map()
 	if err != nil {
 		// is array
 	}
@@ -211,7 +234,6 @@ func (e *Engine) filterByQuery(q string) {
 	}
 	sort.Strings(keys)
 	e.currenKeys = keys
-	e.json = json
 }
 
 func isEmptyJson(j *simplejson.Json) bool {
