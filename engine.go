@@ -157,13 +157,24 @@ func (e *Engine) autoComplete() {
 
 func (e *Engine) suggest() bool {
 	s := string(*f)
-	if arr, _ := e.json.Array(); arr != nil && len(arr) == 1 {
-		if s[len(s)-1:] == "." {
+	if arr, _ := e.json.Array(); arr != nil {
+		le := s[len(s)-1:]
+		if le == "." {
 			*complete = []rune("")
 			return false
 		}
-		ds := regexp.MustCompile("\\[0?\\]?$").FindString(s)
-		cs := strings.Replace("[0]", ds, "", -1)
+		var rs string
+		ds := regexp.MustCompile("\\[([0-9]*)?\\]?$").FindString(s)
+		if len(arr) > 1 {
+			if ds == "" {
+				rs = "["
+			} else if le != "]" {
+				rs = "]"
+			}
+		} else {
+			rs = "[0]"
+		}
+		cs := strings.Replace(rs, ds, "", -1)
 		*complete = []rune(cs)
 		return true
 	}
@@ -174,28 +185,53 @@ func (e *Engine) suggest() bool {
 	}
 	lkw, tkws := kws[lki], kws[:lki]
 
-	var c []int
 	re, err := regexp.Compile("(?i)^" + lkw)
 	if err != nil {
 		return false
 	}
+	m := e.getFilteredCurrentKeys(lkw)
 
-	for i, k := range e.currenKeys {
-		if str := re.FindString(k); str != "" {
-			c = append(c, i)
-			lkw = str
+	if len(m) == 1 {
+		for k := range m {
+			kw := re.ReplaceAllString(e.currenKeys[k], "")
+			*complete = []rune(kw)
+			s = strings.Join(tkws, ".") + "." + m[k]
 		}
-	}
-
-	if len(c) == 1 {
-		kw := re.ReplaceAllString(e.currenKeys[c[0]], "")
-		*complete = []rune(kw)
-		s = strings.Join(tkws, ".") + "." + lkw
 		*f = []rune(s)
 		return true
 	}
+	//	else {
+	//		km := map[string]int{}
+	//		var sw string
+	//		for k, v := range m {
+	//			sw = v
+	//			km[v] = k
+	//		}
+	//		if len(km) == 1 {
+	//			kw := re.ReplaceAllString(sw, "")
+	//			*complete = []rune(kw)
+	//			s = strings.Join(tkws, ".") + "." + lkw
+	//		}
+	//	}
 	*complete = []rune("")
 	return false
+}
+
+func (e *Engine) getFilteredCurrentKeys(kw string) map[int]string {
+	m := map[int]string{}
+
+	re, err := regexp.Compile("(?i)^" + kw)
+	if err != nil {
+		return m
+	}
+
+	for i, k := range e.currenKeys {
+		if str := re.FindString(k); str != "" {
+			m[i] = str
+		}
+	}
+
+	return m
 }
 
 func (e *Engine) prettyContents() []string {
@@ -204,17 +240,15 @@ func (e *Engine) prettyContents() []string {
 }
 
 func (e *Engine) filterJson(q string) {
-	json := e.orgJson
+	e.json = e.orgJson
+	e.setCurrentKeys()
 	if len(q) < 1 {
-		e.json = json
-		e.setCurrentKeys()
 		return
 	}
 	keywords := strings.Split(q, ".")
 
 	// check start "."
 	if keywords[0] != "" {
-		e.json = json
 		return
 	}
 
@@ -223,7 +257,7 @@ func (e *Engine) filterJson(q string) {
 	re := regexp.MustCompile("\\[[0-9]*\\]")
 	delre := regexp.MustCompile("\\[([0-9]+)?")
 
-	j := json
+	j := e.json
 	lastIdx := len(keywords) - 1
 
 	//eachFlg := false
@@ -234,7 +268,6 @@ func (e *Engine) filterJson(q string) {
 			}
 			break
 		}
-
 		// abc[0]
 		if keyword[:1] == "[" {
 			break
@@ -260,13 +293,16 @@ func (e *Engine) filterJson(q string) {
 			}
 		} else {
 			kw := delre.ReplaceAllString(keyword, "")
-			if tj := j.Get(kw); !isEmptyJson(tj) {
+			tj := j.Get(kw)
+			if ki != lastIdx {
+				j = tj
+				// kokoni
+			} else if len(e.getFilteredCurrentKeys(kw)) < 1 {
 				j = tj
 			}
 		}
 	}
-	json = j
-	e.json = json
+	e.json = j
 	e.setCurrentKeys()
 }
 
