@@ -26,21 +26,21 @@ var (
 )
 
 type Engine struct {
-	json       *simplejson.Json
-	orgJson    *simplejson.Json
-	currenKeys []string
-	query      bool
-	pretty     bool
+	json        *simplejson.Json
+	orgJson     *simplejson.Json
+	currentKeys []string
+	query       bool
+	pretty      bool
 }
 
 func NewEngine(s *os.File, q bool, p bool) *Engine {
 	j := parse(s)
 	e := &Engine{
-		json:       j,
-		orgJson:    j,
-		currenKeys: []string{},
-		query:      q,
-		pretty:     p,
+		json:        j,
+		orgJson:     j,
+		currentKeys: []string{},
+		query:       q,
+		pretty:      p,
 	}
 	return e
 }
@@ -103,7 +103,7 @@ func (e *Engine) render(json *simplejson.Json) bool {
 		e.filterJson(string(*f))
 		e.suggest()
 		if keymode {
-			contents = e.currenKeys
+			contents = e.currentKeys
 		} else {
 			contents = e.prettyContents()
 		}
@@ -193,7 +193,7 @@ func (e *Engine) suggest() bool {
 
 	if len(m) == 1 {
 		for k := range m {
-			kw := re.ReplaceAllString(e.currenKeys[k], "")
+			kw := re.ReplaceAllString(e.currentKeys[k], "")
 			*complete = []rune(kw)
 			s = strings.Join(tkws, ".") + "." + m[k]
 		}
@@ -225,12 +225,11 @@ func (e *Engine) getFilteredCurrentKeys(kw string) map[int]string {
 		return m
 	}
 
-	for i, k := range e.currenKeys {
+	for i, k := range e.currentKeys {
 		if str := re.FindString(k); str != "" {
 			m[i] = str
 		}
 	}
-
 	return m
 }
 
@@ -240,15 +239,17 @@ func (e *Engine) prettyContents() []string {
 }
 
 func (e *Engine) filterJson(q string) {
-	e.json = e.orgJson
+	json := e.orgJson
 	e.setCurrentKeys()
 	if len(q) < 1 {
+		e.json = json
 		return
 	}
 	keywords := strings.Split(q, ".")
 
 	// check start "."
 	if keywords[0] != "" {
+		e.json = &simplejson.Json{}
 		return
 	}
 
@@ -257,14 +258,14 @@ func (e *Engine) filterJson(q string) {
 	re := regexp.MustCompile("\\[[0-9]*\\]")
 	delre := regexp.MustCompile("\\[([0-9]+)?")
 
-	j := e.json
+	j := json
 	lastIdx := len(keywords) - 1
 
 	//eachFlg := false
 	for ki, keyword := range keywords {
 		if len(keyword) == 0 {
 			if ki != lastIdx {
-				e.json = simplejson.New()
+				e.json = &simplejson.Json{}
 			}
 			break
 		}
@@ -299,6 +300,8 @@ func (e *Engine) filterJson(q string) {
 				// kokoni
 			} else if len(e.getFilteredCurrentKeys(kw)) < 1 {
 				j = tj
+			} else if !isEmptyJson(tj) {
+				j = tj
 			}
 		}
 	}
@@ -316,7 +319,7 @@ func (e *Engine) setCurrentKeys() {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	e.currenKeys = keys
+	e.currentKeys = keys
 }
 
 func isEmptyJson(j *simplejson.Json) bool {
