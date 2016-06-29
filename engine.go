@@ -100,7 +100,8 @@ func (e *Engine) render(json *simplejson.Json) bool {
 	keymode := false
 
 	for {
-		e.filterJson(string(*f))
+		e.json = e.filterJson(string(*f))
+		e.currentKeys = e.getCurrentKeys(e.json)
 		e.suggest()
 		if keymode {
 			contents = e.currentKeys
@@ -189,35 +190,41 @@ func (e *Engine) suggest() bool {
 	if err != nil {
 		return false
 	}
-	m := e.getFilteredCurrentKeys(lkw)
+	m := e.getFilteredCurrentKeys(e.json, lkw)
 
 	if len(m) == 1 {
-		for k := range m {
+		for k, v := range m {
 			kw := re.ReplaceAllString(e.currentKeys[k], "")
 			*complete = []rune(kw)
-			s = strings.Join(tkws, ".") + "." + m[k]
+			s = strings.Join(tkws, ".") + "." + v
 		}
 		*f = []rune(s)
 		return true
 	}
 	//	else {
-	//		km := map[string]int{}
-	//		var sw string
-	//		for k, v := range m {
-	//			sw = v
-	//			km[v] = k
+	//	km := map[string]int{}
+	//	var sw string
+	//	last := len(m) - 1
+	//	for k, v := range m {
+	//		if k == last {
+	//			continue
 	//		}
-	//		if len(km) == 1 {
-	//			kw := re.ReplaceAllString(sw, "")
-	//			*complete = []rune(kw)
-	//			s = strings.Join(tkws, ".") + "." + lkw
+	//		for s := range []rune(v) {
+
 	//		}
+	//		km[v] = k
 	//	}
+	//	if len(km) == 1 {
+	//		kw := re.ReplaceAllString(sw, "")
+	//		*complete = []rune(kw)
+	//		s = strings.Join(tkws, ".") + "." + lkw
+	//	}
+	//}
 	*complete = []rune("")
 	return false
 }
 
-func (e *Engine) getFilteredCurrentKeys(kw string) map[int]string {
+func (e *Engine) getFilteredCurrentKeys(json *simplejson.Json, kw string) map[int]string {
 	m := map[int]string{}
 
 	re, err := regexp.Compile("(?i)^" + kw)
@@ -225,7 +232,8 @@ func (e *Engine) getFilteredCurrentKeys(kw string) map[int]string {
 		return m
 	}
 
-	for i, k := range e.currentKeys {
+	currentKeys := e.getCurrentKeys(json)
+	for i, k := range currentKeys {
 		if str := re.FindString(k); str != "" {
 			m[i] = str
 		}
@@ -238,19 +246,16 @@ func (e *Engine) prettyContents() []string {
 	return strings.Split(string(s), "\n")
 }
 
-func (e *Engine) filterJson(q string) {
+func (e *Engine) filterJson(q string) *simplejson.Json {
 	json := e.orgJson
-	e.setCurrentKeys()
 	if len(q) < 1 {
-		e.json = json
-		return
+		return json
 	}
 	keywords := strings.Split(q, ".")
 
 	// check start "."
 	if keywords[0] != "" {
-		e.json = &simplejson.Json{}
-		return
+		return &simplejson.Json{}
 	}
 
 	keywords = keywords[1:]
@@ -258,14 +263,13 @@ func (e *Engine) filterJson(q string) {
 	re := regexp.MustCompile("\\[[0-9]*\\]")
 	delre := regexp.MustCompile("\\[([0-9]+)?")
 
-	j := json
 	lastIdx := len(keywords) - 1
 
 	//eachFlg := false
 	for ki, keyword := range keywords {
 		if len(keyword) == 0 {
 			if ki != lastIdx {
-				e.json = &simplejson.Json{}
+				json = &simplejson.Json{}
 			}
 			break
 		}
@@ -277,49 +281,49 @@ func (e *Engine) filterJson(q string) {
 			matchIndexes := re.FindAllStringIndex(keyword, -1)
 			kw := re.ReplaceAllString(keyword, "")
 
-			tj := j.Get(kw)
+			tj := json.Get(kw)
 			if ki != lastIdx {
-				j = tj
+				json = tj
 			} else if !isEmptyJson(tj) {
-				j = tj
+				json = tj
 			}
 			lmi := len(matchIndexes) - 1
 			for idx, m := range matchIndexes {
 				i, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
 				if idx == lmi && m[1]-m[0] == 2 {
 					//eachFlg = true
-				} else if tj := j.GetIndex(i); !isEmptyJson(tj) {
-					j = tj
+				} else if tj := json.GetIndex(i); !isEmptyJson(tj) {
+					json = tj
 				}
 			}
 		} else {
 			kw := delre.ReplaceAllString(keyword, "")
-			tj := j.Get(kw)
+			tj := json.Get(kw)
 			if ki != lastIdx {
-				j = tj
-				// kokoni
-			} else if len(e.getFilteredCurrentKeys(kw)) < 1 {
-				j = tj
+				json = tj
+			} else if len(e.getFilteredCurrentKeys(json, kw)) < 1 {
+				json = tj
 			} else if !isEmptyJson(tj) {
-				j = tj
+				json = tj
 			}
 		}
 	}
-	e.json = j
-	e.setCurrentKeys()
+	return json
 }
 
-func (e *Engine) setCurrentKeys() {
-	m, err := e.json.Map()
-	if err != nil {
-		// is array
-	}
+func (e *Engine) getCurrentKeys(json *simplejson.Json) []string {
+
 	keys := []string{}
+	m, err := json.Map()
+
+	if err != nil {
+		return keys
+	}
 	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	e.currentKeys = keys
+	return keys
 }
 
 func isEmptyJson(j *simplejson.Json) bool {
