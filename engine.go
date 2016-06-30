@@ -104,7 +104,12 @@ func (e *Engine) render(json *simplejson.Json) bool {
 		e.currentKeys = e.getCurrentKeys(e.json)
 		e.suggest()
 		if keymode {
-			contents = e.currentKeys
+			ckeys := []string{}
+			kws := strings.Split(string(*f), ".")
+			for k, _ := range e.getFilteredCurrentKeys(e.json, kws[len(kws)-1]) {
+				ckeys = append(ckeys, e.currentKeys[k])
+			}
+			contents = ckeys
 		} else {
 			contents = e.prettyContents()
 		}
@@ -200,26 +205,38 @@ func (e *Engine) suggest() bool {
 		}
 		*f = []rune(s)
 		return true
+	} else {
+		var sw []rune
+		cnt := 0
+		for k, _ := range m {
+			tsw := []rune{}
+			v := []rune(e.currentKeys[k])
+			if cnt == 0 {
+				sw = v
+				cnt = cnt + 1
+				continue
+			}
+			swl := len(sw) - 1
+			for i, s := range v {
+				if i > swl {
+					break
+				}
+				if sw[i] != s {
+					break
+				}
+				tsw = append(tsw, s)
+			}
+			sw = tsw
+			cnt = cnt + 1
+		}
+		if len(sw) >= 0 {
+			kw := re.ReplaceAllString(string(sw), "")
+			*complete = []rune(kw)
+			s = strings.Join(tkws, ".") + "." + lkw
+		}
+		*f = []rune(s)
+		return true
 	}
-	//	else {
-	//	km := map[string]int{}
-	//	var sw string
-	//	last := len(m) - 1
-	//	for k, v := range m {
-	//		if k == last {
-	//			continue
-	//		}
-	//		for s := range []rune(v) {
-
-	//		}
-	//		km[v] = k
-	//	}
-	//	if len(km) == 1 {
-	//		kw := re.ReplaceAllString(sw, "")
-	//		*complete = []rune(kw)
-	//		s = strings.Join(tkws, ".") + "." + lkw
-	//	}
-	//}
 	*complete = []rune("")
 	return false
 }
