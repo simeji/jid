@@ -106,10 +106,15 @@ func (e *Engine) render(json *simplejson.Json) bool {
 		if keymode {
 			ckeys := []string{}
 			kws := strings.Split(string(*f), ".")
-			for k, _ := range e.getFilteredCurrentKeys(e.json, kws[len(kws)-1]) {
-				ckeys = append(ckeys, e.currentKeys[k])
+			if lkw := kws[len(kws)-1]; lkw != "" {
+				for k, _ := range e.getFilteredCurrentKeys(e.json, lkw) {
+					ckeys = append(ckeys, e.currentKeys[k])
+				}
+				sort.Strings(ckeys)
+				contents = ckeys
+			} else {
+				contents = e.currentKeys
 			}
-			contents = ckeys
 		} else {
 			contents = e.prettyContents()
 		}
@@ -128,8 +133,12 @@ func (e *Engine) render(json *simplejson.Json) bool {
 				s := string(*f)
 				kws := strings.Split(s, ".")
 				lki := len(kws) - 1
-				_, kws = kws[lki], kws[:lki]
+				var lk string
+				lk, kws = kws[lki], kws[:lki]
 				s = strings.Join(kws, ".")
+				if lk != "" {
+					s = s + "."
+				}
 				*f = []rune(s[0:len(s)])
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				if i := len(*f) - 1; i >= 0 {
@@ -164,6 +173,10 @@ func (e *Engine) autoComplete() {
 func (e *Engine) suggest() bool {
 	s := string(*f)
 	if arr, _ := e.json.Array(); arr != nil {
+		if l := len(s); l < 1 {
+			*complete = []rune("")
+			return false
+		}
 		le := s[len(s)-1:]
 		if le == "." {
 			*complete = []rune("")
@@ -292,9 +305,17 @@ func (e *Engine) filterJson(q string) *simplejson.Json {
 		}
 		// abc[0]
 		if keyword[:1] == "[" {
-			break
-		}
-		if keyword[len(keyword)-1:] == "]" {
+			matchIndexes := re.FindAllStringIndex(keyword, -1)
+			lmi := len(matchIndexes) - 1
+			for idx, m := range matchIndexes {
+				i, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
+				if idx == lmi && m[1]-m[0] == 2 {
+					//eachFlg = true
+				} else if tj := json.GetIndex(i); !isEmptyJson(tj) {
+					json = tj
+				}
+			}
+		} else if keyword[len(keyword)-1:] == "]" {
 			matchIndexes := re.FindAllStringIndex(keyword, -1)
 			kw := re.ReplaceAllString(keyword, "")
 
