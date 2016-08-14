@@ -1,13 +1,12 @@
 package jig
 
 import (
-	//"errors"
 	"fmt"
 	"github.com/bitly/go-simplejson"
 	"github.com/nsf/termbox-go"
+	"io"
 	"io/ioutil"
 	"log"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -21,7 +20,6 @@ const (
 )
 
 var (
-	f        *[]rune
 	complete *[]rune
 )
 
@@ -29,18 +27,23 @@ type Engine struct {
 	json        *simplejson.Json
 	orgJson     *simplejson.Json
 	currentKeys []string
-	query       bool
+	jq          bool
 	pretty      bool
+	query       *Query
 }
 
-func NewEngine(s *os.File, q bool, p bool) *Engine {
-	j := parse(s)
+func NewEngine(s io.Reader, q bool, p bool) *Engine {
+	j, err := parse(s)
+	if err != true {
+		return &Engine{}
+	}
 	e := &Engine{
 		json:        j,
 		orgJson:     j,
 		currentKeys: []string{},
-		query:       q,
+		jq:          q,
 		pretty:      p,
+		query:       NewQuery([]rune("")),
 	}
 	return e
 }
@@ -50,8 +53,8 @@ func (e Engine) Run() int {
 	if !e.render(e.json) {
 		return 2
 	}
-	if e.query {
-		fmt.Printf("%s", string(*f))
+	if e.jq {
+		fmt.Printf("%s", e.query.StringGet())
 	} else if e.pretty {
 		s, err := e.json.EncodePretty()
 		if err != nil {
@@ -68,20 +71,23 @@ func (e Engine) Run() int {
 	return 0
 }
 
-func parse(content *os.File) *simplejson.Json {
+func parse(content io.Reader) (*simplejson.Json, bool) {
+	res := true
 	buf, err := ioutil.ReadAll(content)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Bad contents '", err, "'")
+		res = false
 	}
 
-	js, err := simplejson.NewJson(buf)
+	j, err := simplejson.NewJson(buf)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Bad Json Format '", err, "'")
+		res = false
 	}
 
-	return js
+	return j, res
 }
 
 // fix:me
@@ -93,20 +99,22 @@ func (e *Engine) render(json *simplejson.Json) bool {
 	}
 	defer termbox.Close()
 
-	f = &[]rune{}
 	complete = &[]rune{}
 
 	contents := e.prettyContents()
 	keymode := false
 
 	for {
-		e.json = e.filterJson(string(*f))
+		var flgFilter bool
+		e.json, flgFilter = e.filterJson(e.orgJson, e.query.StringGet())
 		e.currentKeys = e.getCurrentKeys(e.json)
-		e.suggest()
+		if !flgFilter {
+			e.suggest()
+		}
 		if keymode {
 			ckeys := []string{}
-			kws := strings.Split(string(*f), ".")
-			if lkw := kws[len(kws)-1]; lkw != "" {
+			kws := e.query.StringGetKeywords()
+			if lkw := kws[len(kws)-1]; lkw != "" && !flgFilter {
 				for k, _ := range e.getFilteredCurrentKeys(e.json, lkw) {
 					ckeys = append(ckeys, e.currentKeys[k])
 				}
@@ -118,7 +126,7 @@ func (e *Engine) render(json *simplejson.Json) bool {
 		} else {
 			contents = e.prettyContents()
 		}
-		draw(contents)
+		e.draw(contents)
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
@@ -127,10 +135,10 @@ func (e *Engine) render(json *simplejson.Json) bool {
 			case termbox.KeyCtrlK:
 				keymode = !keymode
 			case termbox.KeySpace:
-				*f = append(*f, rune(' '))
+				_ = e.query.StringAdd(" ")
 			case termbox.KeyCtrlW:
 				//delete whole word to period
-				s := string(*f)
+				s := e.query.StringGet()
 				kws := strings.Split(s, ".")
 				lki := len(kws) - 1
 				var lk string
@@ -139,12 +147,9 @@ func (e *Engine) render(json *simplejson.Json) bool {
 				if lk != "" {
 					s = s + "."
 				}
-				*f = []rune(s[0:len(s)])
+				_ = e.query.StringSet(s[0:len(s)])
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
-				if i := len(*f) - 1; i >= 0 {
-					slice := *f
-					*f = slice[0:i]
-				}
+				_ = e.query.Delete(1)
 			case termbox.KeyTab:
 				if len(*complete) > 0 {
 					e.autoComplete()
@@ -154,7 +159,7 @@ func (e *Engine) render(json *simplejson.Json) bool {
 			case termbox.KeyEnter:
 				return true
 			case 0:
-				*f = append(*f, rune(ev.Ch))
+				_ = e.query.StringAdd(string(ev.Ch))
 			default:
 			}
 		case termbox.EventError:
@@ -166,12 +171,12 @@ func (e *Engine) render(json *simplejson.Json) bool {
 }
 
 func (e *Engine) autoComplete() {
-	*f = append(*f, *complete...)
+	_ = e.query.Add(*complete)
 	*complete = []rune("")
 }
 
 func (e *Engine) suggest() bool {
-	s := string(*f)
+	s := e.query.StringGet()
 	if arr, _ := e.json.Array(); arr != nil {
 		if l := len(s); l < 1 {
 			*complete = []rune("")
@@ -216,7 +221,7 @@ func (e *Engine) suggest() bool {
 			*complete = []rune(kw)
 			s = strings.Join(tkws, ".") + "." + v
 		}
-		*f = []rune(s)
+		_ = e.query.StringSet(s)
 		return true
 	} else {
 		var sw []rune
@@ -247,7 +252,7 @@ func (e *Engine) suggest() bool {
 			*complete = []rune(kw)
 			s = strings.Join(tkws, ".") + "." + lkw
 		}
-		*f = []rune(s)
+		_ = e.query.StringSet(s)
 		return true
 	}
 	*complete = []rune("")
@@ -276,16 +281,15 @@ func (e *Engine) prettyContents() []string {
 	return strings.Split(string(s), "\n")
 }
 
-func (e *Engine) filterJson(q string) *simplejson.Json {
-	json := e.orgJson
+func (e *Engine) filterJson(json *simplejson.Json, q string) (*simplejson.Json, bool) {
 	if len(q) < 1 {
-		return json
+		return json, false
 	}
 	keywords := strings.Split(q, ".")
 
 	// check start "."
 	if keywords[0] != "" {
-		return &simplejson.Json{}
+		return &simplejson.Json{}, false
 	}
 
 	keywords = keywords[1:]
@@ -294,6 +298,8 @@ func (e *Engine) filterJson(q string) *simplejson.Json {
 	delre := regexp.MustCompile("\\[([0-9]+)?")
 
 	lastIdx := len(keywords) - 1
+
+	flgMatchLastKw := false
 
 	//eachFlg := false
 	for ki, keyword := range keywords {
@@ -324,6 +330,7 @@ func (e *Engine) filterJson(q string) *simplejson.Json {
 				json = tj
 			} else if !isEmptyJson(tj) {
 				json = tj
+				flgMatchLastKw = true
 			}
 			lmi := len(matchIndexes) - 1
 			for idx, m := range matchIndexes {
@@ -332,6 +339,7 @@ func (e *Engine) filterJson(q string) *simplejson.Json {
 					//eachFlg = true
 				} else if tj := json.GetIndex(i); !isEmptyJson(tj) {
 					json = tj
+					flgMatchLastKw = true
 				}
 			}
 		} else {
@@ -343,10 +351,11 @@ func (e *Engine) filterJson(q string) *simplejson.Json {
 				json = tj
 			} else if !isEmptyJson(tj) {
 				json = tj
+				flgMatchLastKw = true
 			}
 		}
 	}
-	return json
+	return json, flgMatchLastKw
 }
 
 func (e *Engine) getCurrentKeys(json *simplejson.Json) []string {
@@ -373,11 +382,11 @@ func isEmptyJson(j *simplejson.Json) bool {
 	}
 }
 
-func draw(rows []string) {
+func (e *Engine) draw(rows []string) {
 
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	fs := FilterPrompt + string(*f)
+	fs := FilterPrompt + e.query.StringGet()
 	cs := string(*complete)
 	drawln(0, 0, fs+cs, []([]int){[]int{len(fs), len(fs) + len(cs)}})
 	termbox.SetCursor(len(fs), 0)
