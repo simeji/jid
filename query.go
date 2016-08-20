@@ -1,8 +1,25 @@
 package jig
 
 import (
+	"regexp"
 	"strings"
 )
+
+type QueryInterface interface {
+	Get() []rune
+	Set(query []rune) []rune
+	Add(query []rune) []rune
+	Delete(i int) []rune
+	Clear() []rune
+	GetKeywords() [][]rune
+	GetLastKeyword() []rune
+	PopKeyword() ([]rune, []rune)
+	StringGet() string
+	StringSet(query string) string
+	StringAdd(query string) string
+	StringGetKeywords() []string
+	StringPopKeyword() (string, []rune)
+}
 
 type Query struct {
 	query    *[]rune
@@ -10,10 +27,15 @@ type Query struct {
 }
 
 func NewQuery(query []rune) *Query {
-	return &Query{
-		query:    &query,
+	q := &Query{
+		query:    &[]rune{},
 		complete: &[]rune{},
 	}
+	_ = q.Set(query)
+	return q
+}
+func NewQueryWithString(query string) *Query {
+	return NewQuery([]rune(query))
 }
 
 func (q *Query) Get() []rune {
@@ -21,7 +43,9 @@ func (q *Query) Get() []rune {
 }
 
 func (q *Query) Set(query []rune) []rune {
-	q.query = &query
+	if validate(query) {
+		q.query = &query
+	}
 	return q.Get()
 }
 
@@ -45,13 +69,29 @@ func (q *Query) Clear() []rune {
 func (q *Query) GetKeywords() [][]rune {
 	query := string(*q.query)
 
+	if query == "" {
+		return [][]rune{}
+	}
+
 	splitQuery := strings.Split(query, ".")
 	lastIdx := len(splitQuery) - 1
 
 	keywords := [][]rune{}
 	for i, keyword := range splitQuery {
 		if keyword != "" || i == lastIdx {
-			keywords = append(keywords, []rune(keyword))
+			re := regexp.MustCompile(`\[[0-9]+\]`)
+			matchIndexes := re.FindAllStringIndex(keyword, -1)
+			if len(matchIndexes) < 1 {
+				keywords = append(keywords, []rune(keyword))
+			} else {
+				if matchIndexes[0][0] > 0 {
+					keywords = append(keywords, []rune(keyword[0:matchIndexes[0][0]]))
+				}
+				for _, matchIndex := range matchIndexes {
+					k := keyword[matchIndex[0]:matchIndex[1]]
+					keywords = append(keywords, []rune(k))
+				}
+			}
 		}
 	}
 	return keywords
@@ -63,15 +103,27 @@ func (q *Query) GetLastKeyword() []rune {
 }
 
 func (q *Query) PopKeyword() ([]rune, []rune) {
-	lastSepIdx := 0
-	for i, e := range *q.query {
+	var keyword []rune
+	var lastSepIdx int
+	var lastBracketIdx int
+	qq := q.Get()
+	for i, e := range qq {
 		if e == '.' {
 			lastSepIdx = i
+		} else if e == '[' {
+			lastBracketIdx = i
 		}
 	}
-	qq := q.Get()
-	keyword := qq[lastSepIdx+1:]
-	query := q.Set(qq[0 : lastSepIdx+1])
+
+	if lastBracketIdx > lastSepIdx {
+		lastSepIdx = lastBracketIdx
+	}
+
+	keywords := q.GetKeywords()
+	if l := len(keywords); l > 0 {
+		keyword = keywords[l-1]
+	}
+	query := q.Set(qq[0:lastSepIdx])
 	return keyword, query
 }
 
@@ -88,16 +140,34 @@ func (q *Query) StringAdd(query string) string {
 }
 
 func (q *Query) StringGetKeywords() []string {
-	query := string(*q.query)
-
-	splitQuery := strings.Split(query, ".")
-	lastIdx := len(splitQuery) - 1
-
-	keywords := []string{}
-	for i, keyword := range splitQuery {
-		if keyword != "" || i == lastIdx {
-			keywords = append(keywords, keyword)
-		}
+	var keywords []string
+	for _, keyword := range q.GetKeywords() {
+		keywords = append(keywords, string(keyword))
 	}
 	return keywords
+}
+
+func (q *Query) StringPopKeyword() (string, []rune) {
+	keyword, query := q.PopKeyword()
+	return string(keyword), query
+}
+
+func validate(r []rune) bool {
+	s := string(r)
+	if regexp.MustCompile(`^[^.]`).MatchString(s) {
+		return false
+	}
+	if regexp.MustCompile(`\.{2,}`).MatchString(s) {
+		return false
+	}
+	if regexp.MustCompile(`\[[0-9]*\][^\.\[]`).MatchString(s) {
+		return false
+	}
+	if regexp.MustCompile(`\[{2,}|\]{2,}`).MatchString(s) {
+		return false
+	}
+	if regexp.MustCompile(`.\.\[`).MatchString(s) {
+		return false
+	}
+	return true
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/nsf/termbox-go"
 	"io"
 	"io/ioutil"
-	"log"
 	"regexp"
 	"sort"
 	"strconv"
@@ -26,6 +25,7 @@ var (
 type Engine struct {
 	json        *simplejson.Json
 	orgJson     *simplejson.Json
+	manager     *JsonManager
 	currentKeys []string
 	jq          bool
 	pretty      bool
@@ -76,14 +76,14 @@ func parse(content io.Reader) (*simplejson.Json, bool) {
 	buf, err := ioutil.ReadAll(content)
 
 	if err != nil {
-		log.Printf("Bad contents '", err, "'")
+		//log.Printf("Bad contents '", err, "'")
 		res = false
 	}
 
 	j, err := simplejson.NewJson(buf)
 
 	if err != nil {
-		log.Printf("Bad Json Format '", err, "'")
+		//log.Printf("Bad Json Format '", err, "'")
 		res = false
 	}
 
@@ -371,15 +371,6 @@ func (e *Engine) getCurrentKeys(json *simplejson.Json) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func isEmptyJson(j *simplejson.Json) bool {
-	switch j.Interface().(type) {
-	case nil:
-		return true
-	default:
-		return false
-	}
 }
 
 func (e *Engine) draw(rows []string) {
