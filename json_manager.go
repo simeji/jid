@@ -6,13 +6,14 @@ import (
 	"io"
 	"io/ioutil"
 	"regexp"
-	"sort"
 	"strconv"
+	//"strings"
 )
 
 type JsonManager struct {
-	current *simplejson.Json
-	origin  *simplejson.Json
+	current    *simplejson.Json
+	origin     *simplejson.Json
+	suggestion *Suggestion
 }
 
 func NewJsonManager(reader io.Reader) (*JsonManager, error) {
@@ -29,53 +30,67 @@ func NewJsonManager(reader io.Reader) (*JsonManager, error) {
 	}
 
 	json := &JsonManager{
-		origin:  j,
-		current: j,
+		origin:     j,
+		current:    j,
+		suggestion: NewSuggestion(),
 	}
 
 	return json, nil
 }
 
-func (jm *JsonManager) Get(q QueryInterface) (string, error) {
-	json, _ := jm.GetFilteredData(q)
+func (jm *JsonManager) Get(q QueryInterface) (string, string, error) {
+	json, suggestion, _ := jm.GetFilteredData(q)
 
 	data, enc_err := json.Encode()
 
 	if enc_err != nil {
-		return "", errors.Wrap(enc_err, "failure json encode")
+		return "", "", errors.Wrap(enc_err, "failure json encode")
 	}
 
-	return string(data), nil
+	return string(data), suggestion, nil
 }
 
-func (jm *JsonManager) GetPretty(q QueryInterface) (string, error) {
-	json, _ := jm.GetFilteredData(q)
+func (jm *JsonManager) GetPretty(q QueryInterface) (string, string, error) {
+	json, suggestion, _ := jm.GetFilteredData(q)
 	s, err := json.EncodePretty()
 	if err != nil {
-		return "", errors.Wrap(err, "failure json encode")
+		return "", "", errors.Wrap(err, "failure json encode")
 	}
-	return string(s), nil
+	return string(s), suggestion, nil
 }
 
-func (jm *JsonManager) GetFilteredData(q QueryInterface) (*simplejson.Json, error) {
+func (jm *JsonManager) GetFilteredData(q QueryInterface) (*simplejson.Json, string, error) {
 	json := jm.origin
 
-	lastKeyword, _ := q.StringPopKeyword()
-	for _, keyword := range q.StringGetKeywords() {
+	lastKeyword := q.StringGetLastKeyword()
+	keywords := q.StringGetKeywords()
+	idx := 0
+	if l := len(keywords); l > 0 {
+		idx = l - 1
+	}
+	for _, keyword := range keywords[0:idx] {
 		json, _ = getItem(json, keyword)
 	}
-	if j, _ := getItem(json, lastKeyword); !isEmptyJson(j) {
+	reg := regexp.MustCompile(`\[[0-9]*$`)
+
+	suggest := jm.suggestion.Get(json, lastKeyword)
+
+	if len(reg.FindString(lastKeyword)) > 0 {
+	} else if j, _ := getItem(json, lastKeyword); !isEmptyJson(j) {
 		json = j
-	} else if b, _ := getCandidateKeyItem(json, lastKeyword); !b {
+		suggest = jm.suggestion.Get(json, "")
+	} else if len(jm.suggestion.GetCandidateKeys(json, lastKeyword)) < 1 {
 		json = j
 	}
-	return json, nil
+	return json, suggest, nil
 }
 
 func getItem(json *simplejson.Json, s string) (*simplejson.Json, error) {
 	var result *simplejson.Json
+
 	re := regexp.MustCompile(`\[([0-9]+)\]`)
 	matches := re.FindStringSubmatch(s)
+
 	if len(matches) > 0 {
 		index, _ := strconv.Atoi(matches[1])
 		result = json.GetIndex(index)
@@ -83,63 +98,6 @@ func getItem(json *simplejson.Json, s string) (*simplejson.Json, error) {
 		result = json.Get(s)
 	}
 	return result, nil
-}
-
-func getCandidateKeyItem(json *simplejson.Json, s string) (bool, string) {
-	re := regexp.MustCompile(`\[([0-9]+)\]`)
-	matches := re.FindStringSubmatch(s)
-	if len(matches) > 0 {
-		index, _ := strconv.Atoi(matches[1])
-		a, err := json.Array()
-		if err != nil {
-			return false, ""
-		}
-		if len(a)-1 < index {
-			return false, ""
-		}
-	} else {
-		reg := regexp.MustCompile("(?i)^" + s)
-		var candidate string
-		result := false
-		for _, key := range getCurrentKeys(json) {
-			if reg.MatchString(key) {
-				result = true
-				if candidate == "" {
-					candidate = key
-				} else {
-					axis := candidate
-					if len(candidate) > len(key) {
-						axis = key
-					}
-					max := 0
-					for i, _ := range axis {
-						if candidate[i] == key[i] {
-							max = i
-						}
-					}
-					candidate = candidate[0 : max+1]
-				}
-			}
-		}
-		candidate = reg.ReplaceAllString(candidate, "")
-		return result, candidate
-	}
-	return true, ""
-}
-
-func getCurrentKeys(json *simplejson.Json) []string {
-
-	keys := []string{}
-	m, err := json.Map()
-
-	if err != nil {
-		return keys
-	}
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func isEmptyJson(j *simplejson.Json) bool {

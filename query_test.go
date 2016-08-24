@@ -154,6 +154,20 @@ func TestGetKeywords(t *testing.T) {
 		[]rune(""),
 	})
 
+	v = []rune(".hello[")
+	q = NewQuery(v)
+	assert.Equal(q.GetKeywords(), [][]rune{
+		[]rune("hello"),
+		[]rune("["),
+	})
+
+	v = []rune(".hello[12")
+	q = NewQuery(v)
+	assert.Equal(q.GetKeywords(), [][]rune{
+		[]rune("hello"),
+		[]rune("[12"),
+	})
+
 	v = []rune(".hello[0]")
 	q = NewQuery(v)
 	assert.Equal(q.GetKeywords(), [][]rune{

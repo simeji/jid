@@ -18,6 +18,7 @@ type QueryInterface interface {
 	StringSet(query string) string
 	StringAdd(query string) string
 	StringGetKeywords() []string
+	StringGetLastKeyword() string
 	StringPopKeyword() (string, []rune)
 }
 
@@ -79,7 +80,7 @@ func (q *Query) GetKeywords() [][]rune {
 	keywords := [][]rune{}
 	for i, keyword := range splitQuery {
 		if keyword != "" || i == lastIdx {
-			re := regexp.MustCompile(`\[[0-9]+\]`)
+			re := regexp.MustCompile(`\[[0-9]*\]?`)
 			matchIndexes := re.FindAllStringIndex(keyword, -1)
 			if len(matchIndexes) < 1 {
 				keywords = append(keywords, []rune(keyword))
@@ -99,7 +100,14 @@ func (q *Query) GetKeywords() [][]rune {
 
 func (q *Query) GetLastKeyword() []rune {
 	keywords := q.GetKeywords()
-	return keywords[len(keywords)-1]
+	if l := len(keywords); l > 0 {
+		return keywords[l-1]
+	}
+	return []rune("")
+}
+
+func (q *Query) StringGetLastKeyword() string {
+	return string(q.GetLastKeyword())
 }
 
 func (q *Query) PopKeyword() ([]rune, []rune) {
