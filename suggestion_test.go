@@ -17,21 +17,35 @@ func TestSuggestionGet(t *testing.T) {
 	var assert = assert.New(t)
 	j := createJson(`{"name":"simeji-github", "naming":"simeji", "nickname":"simejisimeji"}`)
 	s := NewSuggestion()
-	assert.Equal(s.Get(j, "na"), "m")
+	assert.Equal([]string{"m", "nam"}, s.Get(j, "na"))
 
 	j = createJson(`{"abcde":"simeji-github", "abcdef":"simeji", "ab":"simejisimeji"}`)
-	assert.Equal("", s.Get(j, ""))
-	assert.Equal("b", s.Get(j, "a"))
-	assert.Equal("de", s.Get(j, "abc"))
-	assert.Equal("", s.Get(j, "abcde"))
+	assert.Equal([]string{".", "."}, s.Get(j, ""))
+	assert.Equal([]string{"b", "ab"}, s.Get(j, "a"))
+	assert.Equal([]string{"de", "abcde"}, s.Get(j, "abc"))
+	assert.Equal([]string{"", "abcde"}, s.Get(j, "abcde"))
 
 	j = createJson(`["zero"]`)
-	assert.Equal("[0]", s.Get(j, ""))
-	assert.Equal("0]", s.Get(j, "["))
-	assert.Equal("]", s.Get(j, "[0"))
+	assert.Equal([]string{"[0]", "[0]"}, s.Get(j, ""))
+	assert.Equal([]string{"0]", "[0]"}, s.Get(j, "["))
+	assert.Equal([]string{"]", "[0]"}, s.Get(j, "[0"))
 
 	j = createJson(`["zero", "one"]`)
-	assert.Equal("[", s.Get(j, ""))
+	assert.Equal([]string{"[", "["}, s.Get(j, ""))
+
+	assert.Equal([]string{"", "["}, s.Get(j, "["))
+}
+
+func TestSuggestionGetCurrentType(t *testing.T) {
+	var assert = assert.New(t)
+	s := NewSuggestion()
+
+	j := createJson(`[1,2,3]`)
+	assert.Equal(ARRAY, s.GetCurrentType(j))
+	j = createJson(`{"name":[1,2,3], "naming":{"account":"simeji"}, "test":"simeji", "testing":"ok"}`)
+	assert.Equal(MAP, s.GetCurrentType(j))
+	j = createJson(`"name"`)
+	assert.Equal(STRING, s.GetCurrentType(j))
 }
 
 func TestSuggestionGetCandidateKeys(t *testing.T) {

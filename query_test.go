@@ -211,6 +211,22 @@ func TestGetLastKeyword(t *testing.T) {
 	assert.Equal(q.GetLastKeyword(), []rune("test"))
 }
 
+func TestStringGetLastKeyword(t *testing.T) {
+	var assert = assert.New(t)
+
+	v := []rune(".test.name")
+	q := NewQuery(v)
+	assert.Equal(q.StringGetLastKeyword(), "name")
+
+	v = []rune(".test.")
+	q = NewQuery(v)
+	assert.Equal(q.StringGetLastKeyword(), "")
+
+	v = []rune(".test")
+	q = NewQuery(v)
+	assert.Equal(q.StringGetLastKeyword(), "test")
+}
+
 func TestPopKeyword(t *testing.T) {
 	var assert = assert.New(t)
 

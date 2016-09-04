@@ -14,10 +14,11 @@ const (
 )
 
 type Engine struct {
-	manager *JsonManager
-	jq      bool
-	pretty  bool
-	query   *Query
+	manager  *JsonManager
+	jq       bool
+	pretty   bool
+	query    *Query
+	complete []string
 }
 
 func NewEngine(s io.Reader, q bool, p bool) *Engine {
@@ -26,10 +27,11 @@ func NewEngine(s io.Reader, q bool, p bool) *Engine {
 		return &Engine{}
 	}
 	e := &Engine{
-		manager: j,
-		jq:      q,
-		pretty:  p,
-		query:   NewQuery([]rune("")),
+		manager:  j,
+		jq:       q,
+		pretty:   p,
+		query:    NewQuery([]rune("")),
+		complete: []string{"", ""},
 	}
 	return e
 }
@@ -57,7 +59,6 @@ func (e Engine) Run() int {
 	return 0
 }
 
-// fix:me
 func (e *Engine) render() bool {
 
 	err := termbox.Init()
@@ -66,50 +67,39 @@ func (e *Engine) render() bool {
 	}
 	defer termbox.Close()
 
-	contents, _, _ := e.manager.GetPretty(e.query)
 	keymode := false
 
-	var complete string
+	var contents []string
+	var c string
 
 	for {
 		//var flgFilter bool
-		contents, complete, _ = e.manager.GetPretty(e.query)
 		if keymode {
-			//ckeys := []string{}
-			//kws := e.query.StringGetKeywords()
-			//if lkw := kws[len(kws)-1]; lkw != "" && !flgFilter {
-			//for k, _ := range e.getFilteredCurrentKeys(e.json, lkw) {
-			//ckeys = append(ckeys, e.currentKeys[k])
-			//}
-			//sort.Strings(ckeys)
-			//contents = ckeys
-			//} else {
-			//contents = e.currentKeys
-			//}
+			contents = e.manager.GetCandidateKeys(e.query)
 		} else {
-			//contents, complete, _ = e.manager.GetPretty(e.query)
+			c, e.complete, _ = e.manager.GetPretty(e.query)
+			contents = strings.Split(c, "\n")
 		}
-		e.draw(e.query.StringGet(), complete, strings.Split(contents, "\n"))
+		e.draw(e.query.StringGet(), e.complete[0], contents)
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
-			case termbox.KeyEsc, termbox.KeyCtrlC:
-				return false
+			case 0:
+				e.inputAction(ev.Ch)
+			case termbox.KeyBackspace, termbox.KeyBackspace2:
+				e.backspaceAction()
+			case termbox.KeyTab:
+				e.tabAction()
 			case termbox.KeyCtrlK:
 				keymode = !keymode
 			case termbox.KeySpace:
-				_ = e.query.StringAdd(" ")
+				e.spaceAction()
 			case termbox.KeyCtrlW:
-				//delete whole word to period
-				_, _ = e.query.PopKeyword()
-			case termbox.KeyBackspace, termbox.KeyBackspace2:
-				_ = e.query.Delete(1)
-			case termbox.KeyTab:
-				_ = e.query.StringAdd(complete)
+				e.ctrlwAction()
 			case termbox.KeyEnter:
 				return true
-			case 0:
-				_ = e.query.StringAdd(string(ev.Ch))
+			case termbox.KeyEsc, termbox.KeyCtrlC:
+				return false
 			default:
 			}
 		case termbox.EventError:
@@ -120,204 +110,26 @@ func (e *Engine) render() bool {
 	}
 }
 
-//
-//func (e *Engine) suggest() bool {
-//	s := e.query.StringGet()
-//	if arr, _ := e.json.Array(); arr != nil {
-//		if l := len(s); l < 1 {
-//			*complete = []rune("")
-//			return false
-//		}
-//		le := s[len(s)-1:]
-//		if le == "." {
-//			*complete = []rune("")
-//			return false
-//		}
-//		var rs string
-//		ds := regexp.MustCompile("\\[([0-9]*)?\\]?$").FindString(s)
-//		if len(arr) > 1 {
-//			if ds == "" {
-//				rs = "["
-//			} else if le != "]" {
-//				rs = "]"
-//			}
-//		} else {
-//			rs = "[0]"
-//		}
-//		cs := strings.Replace(rs, ds, "", -1)
-//		*complete = []rune(cs)
-//		return true
-//	}
-//	kws := strings.Split(s, ".")
-//	lki := len(kws) - 1
-//	if lki == 0 {
-//		return false
-//	}
-//	lkw, tkws := kws[lki], kws[:lki]
-//
-//	re, err := regexp.Compile("(?i)^" + lkw)
-//	if err != nil {
-//		return false
-//	}
-//	m := e.getFilteredCurrentKeys(e.json, lkw)
-//
-//	if len(m) == 1 {
-//		for k, v := range m {
-//			kw := re.ReplaceAllString(e.currentKeys[k], "")
-//			*complete = []rune(kw)
-//			s = strings.Join(tkws, ".") + "." + v
-//		}
-//		_ = e.query.StringSet(s)
-//		return true
-//	} else {
-//		var sw []rune
-//		cnt := 0
-//		for k, _ := range m {
-//			tsw := []rune{}
-//			v := []rune(e.currentKeys[k])
-//			if cnt == 0 {
-//				sw = v
-//				cnt = cnt + 1
-//				continue
-//			}
-//			swl := len(sw) - 1
-//			for i, s := range v {
-//				if i > swl {
-//					break
-//				}
-//				if sw[i] != s {
-//					break
-//				}
-//				tsw = append(tsw, s)
-//			}
-//			sw = tsw
-//			cnt = cnt + 1
-//		}
-//		if len(sw) >= 0 {
-//			kw := re.ReplaceAllString(string(sw), "")
-//			*complete = []rune(kw)
-//			s = strings.Join(tkws, ".") + "." + lkw
-//		}
-//		_ = e.query.StringSet(s)
-//		return true
-//	}
-//	*complete = []rune("")
-//	return false
-//}
-
-// func (e *Engine) getFilteredCurrentKeys(json *simplejson.Json, kw string) map[int]string {
-// 	m := map[int]string{}
-//
-// 	re, err := regexp.Compile("(?i)^" + kw)
-// 	if err != nil {
-// 		return m
-// 	}
-//
-// 	currentKeys := e.getCurrentKeys(json)
-// 	for i, k := range currentKeys {
-// 		if str := re.FindString(k); str != "" {
-// 			m[i] = str
-// 		}
-// 	}
-// 	return m
-// }
-//
-//func (e *Engine) prettyContents() []string {
-//	s, _ := e.json.EncodePretty()
-//	return strings.Split(string(s), "\n")
-//}
-
-//func (e *Engine) filterJson(json *simplejson.Json, q string) (*simplejson.Json, bool) {
-//	if len(q) < 1 {
-//		return json, false
-//	}
-//	keywords := strings.Split(q, ".")
-//
-//	// check start "."
-//	if keywords[0] != "" {
-//		return &simplejson.Json{}, false
-//	}
-//
-//	keywords = keywords[1:]
-//
-//	re := regexp.MustCompile("\\[[0-9]*\\]")
-//	delre := regexp.MustCompile("\\[([0-9]+)?")
-//
-//	lastIdx := len(keywords) - 1
-//
-//	flgMatchLastKw := false
-//
-//	//eachFlg := false
-//	for ki, keyword := range keywords {
-//		if len(keyword) == 0 {
-//			if ki != lastIdx {
-//				json = &simplejson.Json{}
-//			}
-//			break
-//		}
-//		// abc[0]
-//		if keyword[:1] == "[" {
-//			matchIndexes := re.FindAllStringIndex(keyword, -1)
-//			lmi := len(matchIndexes) - 1
-//			for idx, m := range matchIndexes {
-//				i, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
-//				if idx == lmi && m[1]-m[0] == 2 {
-//					//eachFlg = true
-//				} else if tj := json.GetIndex(i); !isEmptyJson(tj) {
-//					json = tj
-//				}
-//			}
-//		} else if keyword[len(keyword)-1:] == "]" {
-//			matchIndexes := re.FindAllStringIndex(keyword, -1)
-//			kw := re.ReplaceAllString(keyword, "")
-//
-//			tj := json.Get(kw)
-//			if ki != lastIdx {
-//				json = tj
-//			} else if !isEmptyJson(tj) {
-//				json = tj
-//				flgMatchLastKw = true
-//			}
-//			lmi := len(matchIndexes) - 1
-//			for idx, m := range matchIndexes {
-//				i, _ := strconv.Atoi(keyword[m[0]+1 : m[1]-1])
-//				if idx == lmi && m[1]-m[0] == 2 {
-//					//eachFlg = true
-//				} else if tj := json.GetIndex(i); !isEmptyJson(tj) {
-//					json = tj
-//					flgMatchLastKw = true
-//				}
-//			}
-//		} else {
-//			kw := delre.ReplaceAllString(keyword, "")
-//			tj := json.Get(kw)
-//			if ki != lastIdx {
-//				json = tj
-//			} else if len(e.getFilteredCurrentKeys(json, kw)) < 1 {
-//				json = tj
-//			} else if !isEmptyJson(tj) {
-//				json = tj
-//				flgMatchLastKw = true
-//			}
-//		}
-//	}
-//	return json, flgMatchLastKw
-//}
-
-//func (e *Engine) getCurrentKeys(json *simplejson.Json) []string {
-//
-//	keys := []string{}
-//	m, err := json.Map()
-//
-//	if err != nil {
-//		return keys
-//	}
-//	for k := range m {
-//		keys = append(keys, k)
-//	}
-//	sort.Strings(keys)
-//	return keys
-//}
+func (e *Engine) spaceAction() {
+	_ = e.query.StringAdd(" ")
+}
+func (e *Engine) backspaceAction() {
+	_ = e.query.Delete(1)
+}
+func (e *Engine) ctrlwAction() {
+	_, _ = e.query.PopKeyword()
+	_ = e.query.StringAdd(".")
+}
+func (e *Engine) tabAction() {
+	if (e.complete[0] != e.complete[1]) && e.complete[0] != "" {
+		_, _ = e.query.PopKeyword()
+		_ = e.query.StringAdd(".")
+	}
+	_ = e.query.StringAdd(e.complete[1])
+}
+func (e *Engine) inputAction(ch rune) {
+	_ = e.query.StringAdd(string(ch))
+}
 
 func (e *Engine) draw(query string, complete string, rows []string) {
 

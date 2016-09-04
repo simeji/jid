@@ -8,9 +8,20 @@ import (
 )
 
 type SuggestionInterface interface {
-	Get(json *simplejson.Json, keyword string) string
+	Get(json *simplejson.Json, keyword string) []string
 	GetCandidateKeys(json *simplejson.Json, keyword string) []string
 }
+
+type SuggestionDataType int
+
+const (
+	UNKNOWN SuggestionDataType = iota
+	ARRAY
+	MAP
+	NUMBER
+	STRING
+	BOOL
+)
 
 type Suggestion struct {
 }
@@ -19,26 +30,29 @@ func NewSuggestion() *Suggestion {
 	return &Suggestion{}
 }
 
-func (s *Suggestion) Get(json *simplejson.Json, keyword string) string {
+func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 	var result string
 	var suggestion string
 
+	candidateKeys := s.GetCandidateKeys(json, keyword)
+
 	if a, err := json.Array(); err == nil {
 		if len(a) > 1 {
-			if keyword == "" {
-				return "["
-			} else {
-				return ""
+			rep := ""
+			if len(keyword) > 0 {
+				rep = keyword[0:1]
 			}
-		} else {
-			return strings.Replace(`[0]`, keyword, "", -1)
+			return []string{strings.Replace(`[`, rep, "", -1), `[`}
 		}
+		return []string{strings.Replace(`[0]`, keyword, "", -1), `[0]`}
 	}
 	if keyword == "" {
-		return ""
+		if _, err := json.Map(); err == nil {
+			return []string{".", "."}
+		}
 	}
 
-	for _, key := range s.GetCandidateKeys(json, keyword) {
+	for _, key := range candidateKeys {
 		if suggestion == "" {
 			suggestion = key
 		} else {
@@ -58,7 +72,7 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) string {
 	if reg, err := regexp.Compile("(?i)^" + keyword); err == nil {
 		result = reg.ReplaceAllString(suggestion, "")
 	}
-	return result
+	return []string{result, suggestion}
 }
 
 func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []string {
@@ -97,4 +111,15 @@ func getCurrentKeys(json *simplejson.Json) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func (s *Suggestion) GetCurrentType(json *simplejson.Json) SuggestionDataType {
+	if _, err := json.Array(); err == nil {
+		return ARRAY
+	} else if _, err = json.Map(); err == nil {
+		return MAP
+	} else if _, err = json.String(); err == nil {
+		return STRING
+	}
+	return UNKNOWN
 }

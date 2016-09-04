@@ -25,7 +25,7 @@ func TestNewJson(t *testing.T) {
 	})
 	assert.Nil(e)
 
-	assert.Equal(jm.current.Get("name").MustString(), "go")
+	assert.Equal("go", jm.current.Get("name").MustString())
 }
 
 func TestNewJsonWithError(t *testing.T) {
@@ -48,7 +48,7 @@ func TestGet(t *testing.T) {
 
 	assert.Nil(err)
 	assert.Equal(`"go"`, result)
-	assert.Equal(``, suggest)
+	assert.Equal([]string{``, ``}, suggest)
 
 	// data
 	data := `{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`
@@ -59,8 +59,9 @@ func TestGet(t *testing.T) {
 	q = NewQueryWithString(".abcde")
 	result, suggest, err = jm.Get(q)
 	assert.Nil(err)
-	assert.Equal(`"2AA2"`, result)
-	assert.Equal(``, suggest)
+	//assert.Equal(`"2AA2"`, result)
+	assert.Equal(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`, result)
+	assert.Equal([]string{``, "abcde"}, suggest)
 
 	// case 3
 	q = NewQueryWithString(".abcde_fgh")
@@ -84,14 +85,14 @@ func TestGet(t *testing.T) {
 	result, suggest, err = jm.Get(q)
 	assert.Nil(err)
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, result)
-	assert.Equal(`a`, suggest)
+	assert.Equal([]string{`a`, `aaa`}, suggest)
 
 	// case 7
 	q = NewQueryWithString(".abcde_fgh.ac")
 	result, suggest, err = jm.Get(q)
 	assert.Nil(err)
 	assert.Equal(`null`, result)
-	assert.Equal(``, suggest)
+	assert.Equal([]string{``, ``}, suggest)
 }
 
 func TestGetPretty(t *testing.T) {
@@ -166,8 +167,9 @@ func TestGetFilteredData(t *testing.T) {
 	result, s, err := jm.GetFilteredData(q)
 	assert.Nil(err)
 	d, _ := result.Encode()
-	assert.Equal(`"2AA2"`, string(d))
-	assert.Equal(``, s)
+	assert.Equal(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`, string(d))
+	//assert.Equal(`"2AA2"`, string(d))
+	assert.Equal([]string{``, `abcde`}, s)
 
 	// case 2
 	q = NewQueryWithString(".abcde_fgh")
@@ -175,14 +177,15 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, string(d))
-	assert.Equal(``, s)
+	assert.Equal([]string{`.`, `.`}, s)
 
 	// case 3
 	q = NewQueryWithString(".abcde_fgh.aaa[2]")
-	result, _, err = jm.GetFilteredData(q)
+	result, s, err = jm.GetFilteredData(q)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`[1,2]`, string(d))
+	assert.Equal([]string{``, `[`}, s)
 
 	// case 4
 	q = NewQueryWithString(".abcde_fgh.aaa[3]")
@@ -190,7 +193,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`null`, string(d))
-	assert.Equal(``, s)
+	assert.Equal([]string{``, `[`}, s)
 
 	// case 5
 	q = NewQueryWithString(".abcde_fgh.aaa")
@@ -198,7 +201,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`[123,"cccc",[1,2]]`, string(d))
-	assert.Equal(`[`, s)
+	assert.Equal([]string{`[`, `[`}, s)
 
 	// case 6
 	q = NewQueryWithString(".abcde_fgh.aa")
@@ -206,7 +209,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, string(d))
-	assert.Equal(`a`, s)
+	assert.Equal([]string{`a`, `aaa`}, s)
 
 	// case 7
 	q = NewQueryWithString(".abcde_fgh.aaa[")
@@ -214,7 +217,36 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`[123,"cccc",[1,2]]`, string(d))
-	assert.Equal(``, s)
+	assert.Equal([]string{``, `[`}, s)
+}
+
+func TestGetFilteredDataWithMatchQuery(t *testing.T) {
+	var assert = assert.New(t)
+
+	data := `{"name":[1,2,3], "naming":{"account":"simeji"}, "test":"simeji", "testing":"ok"}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	q := NewQueryWithString(`.name`)
+	result, s, err := jm.GetFilteredData(q)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Equal(`[1,2,3]`, string(d))
+	assert.Equal([]string{"[", "["}, s)
+
+	q = NewQueryWithString(`.naming`)
+	result, s, err = jm.GetFilteredData(q)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"account":"simeji"}`, string(d))
+	assert.Equal([]string{".", "."}, s)
+
+	q = NewQueryWithString(`.test`)
+	result, s, err = jm.GetFilteredData(q)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"name":[1,2,3],"naming":{"account":"simeji"},"test":"simeji","testing":"ok"}`, string(d))
+	assert.Equal([]string{"", "test"}, s)
 }
 
 func TestGetCurrentKeys(t *testing.T) {

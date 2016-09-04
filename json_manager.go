@@ -38,28 +38,28 @@ func NewJsonManager(reader io.Reader) (*JsonManager, error) {
 	return json, nil
 }
 
-func (jm *JsonManager) Get(q QueryInterface) (string, string, error) {
+func (jm *JsonManager) Get(q QueryInterface) (string, []string, error) {
 	json, suggestion, _ := jm.GetFilteredData(q)
 
 	data, enc_err := json.Encode()
 
 	if enc_err != nil {
-		return "", "", errors.Wrap(enc_err, "failure json encode")
+		return "", []string{"", ""}, errors.Wrap(enc_err, "failure json encode")
 	}
 
 	return string(data), suggestion, nil
 }
 
-func (jm *JsonManager) GetPretty(q QueryInterface) (string, string, error) {
+func (jm *JsonManager) GetPretty(q QueryInterface) (string, []string, error) {
 	json, suggestion, _ := jm.GetFilteredData(q)
 	s, err := json.EncodePretty()
 	if err != nil {
-		return "", "", errors.Wrap(err, "failure json encode")
+		return "", []string{"", ""}, errors.Wrap(err, "failure json encode")
 	}
 	return string(s), suggestion, nil
 }
 
-func (jm *JsonManager) GetFilteredData(q QueryInterface) (*simplejson.Json, string, error) {
+func (jm *JsonManager) GetFilteredData(q QueryInterface) (*simplejson.Json, []string, error) {
 	json := jm.origin
 
 	lastKeyword := q.StringGetLastKeyword()
@@ -74,15 +74,22 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface) (*simplejson.Json, stri
 	reg := regexp.MustCompile(`\[[0-9]*$`)
 
 	suggest := jm.suggestion.Get(json, lastKeyword)
-
-	if len(reg.FindString(lastKeyword)) > 0 {
-	} else if j, _ := getItem(json, lastKeyword); !isEmptyJson(j) {
-		json = j
-		suggest = jm.suggestion.Get(json, "")
-	} else if len(jm.suggestion.GetCandidateKeys(json, lastKeyword)) < 1 {
-		json = j
+	candidateKeys := jm.suggestion.GetCandidateKeys(json, lastKeyword)
+	if len(reg.FindString(lastKeyword)) < 1 {
+		candidateNum := len(candidateKeys)
+		if j, _ := getItem(json, lastKeyword); !isEmptyJson(j) && candidateNum == 1 {
+			json = j
+			suggest = jm.suggestion.Get(json, "")
+		} else if candidateNum < 1 {
+			json = j
+		} else {
+		}
 	}
 	return json, suggest, nil
+}
+
+func (jm *JsonManager) GetCandidateKeys(q QueryInterface) []string {
+	return jm.suggestion.GetCandidateKeys(jm.current, q.StringGetLastKeyword())
 }
 
 func getItem(json *simplejson.Json, s string) (*simplejson.Json, error) {
