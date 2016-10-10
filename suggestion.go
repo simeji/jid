@@ -31,29 +31,35 @@ func NewSuggestion() *Suggestion {
 }
 
 func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
-	var result string
+	var completion string
 	var suggestion string
-
-	candidateKeys := s.GetCandidateKeys(json, keyword)
 
 	if a, err := json.Array(); err == nil {
 		if len(a) > 1 {
-			rep := ""
-			if len(keyword) > 0 {
-				rep = keyword[0:1]
+			kw := regexp.MustCompile(`\[([0-9]+)?\]?`).FindString(keyword)
+			if kw == "" {
+				return []string{"[", "["}
+			} else if kw == "[" {
+				return []string{"", "["}
 			}
-			return []string{strings.Replace(`[`, rep, "", -1), `[`}
+			return []string{strings.Replace(kw+"]", kw, "", -1), kw + "]"}
 		}
 		return []string{strings.Replace(`[0]`, keyword, "", -1), `[0]`}
 	}
+
+	candidateKeys := s.GetCandidateKeys(json, keyword)
+
 	if keyword == "" {
-		if _, err := json.Map(); err == nil {
-			return []string{".", "."}
+		if l := len(candidateKeys); l > 1 {
+			return []string{"", ""}
+		} else if l == 1 {
+			return []string{candidateKeys[0], candidateKeys[0]}
 		}
 	}
 
 	for _, key := range candidateKeys {
-		if suggestion == "" {
+		// first
+		if suggestion == "" && key != "" {
 			suggestion = key
 		} else {
 			axis := suggestion
@@ -62,21 +68,26 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 			}
 			max := 0
 			for i, _ := range axis {
-				if suggestion[i] == key[i] {
-					max = i
+				if suggestion[i] != key[i] {
+					break
 				}
+				max = i
+			}
+			if max == 0 {
+				suggestion = ""
+				break
 			}
 			suggestion = suggestion[0 : max+1]
 		}
 	}
 	if reg, err := regexp.Compile("(?i)^" + keyword); err == nil {
-		result = reg.ReplaceAllString(suggestion, "")
+		completion = reg.ReplaceAllString(suggestion, "")
 	}
-	return []string{result, suggestion}
+	return []string{completion, suggestion}
 }
 
 func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []string {
-	var candidates []string
+	candidates := []string{}
 
 	if _, err := json.Array(); err == nil {
 		return []string{}

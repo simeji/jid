@@ -8,17 +8,22 @@ import (
 )
 
 const (
-	PROMPT              = "[jig]>> "
 	DefaultY     int    = 1
 	FilterPrompt string = "[Filter]> "
 )
 
 type Engine struct {
-	manager  *JsonManager
-	jq       bool
-	pretty   bool
-	query    *Query
-	complete []string
+	manager       *JsonManager
+	jq            bool
+	pretty        bool
+	query         *Query
+	term          *Terminal
+	complete      []string
+	keymode       bool
+	candidatemode bool
+	candidateidx  int
+	contentOffset int
+	queryConfirm  bool
 }
 
 func NewEngine(s io.Reader, q bool, p bool) *Engine {
@@ -27,11 +32,17 @@ func NewEngine(s io.Reader, q bool, p bool) *Engine {
 		return &Engine{}
 	}
 	e := &Engine{
-		manager:  j,
-		jq:       q,
-		pretty:   p,
-		query:    NewQuery([]rune("")),
-		complete: []string{"", ""},
+		manager:       j,
+		jq:            q,
+		pretty:        p,
+		term:          NewTerminal(FilterPrompt, DefaultY),
+		query:         NewQuery([]rune("")),
+		complete:      []string{"", ""},
+		keymode:       false,
+		candidatemode: false,
+		candidateidx:  0,
+		contentOffset: 0,
+		queryConfirm:  false,
 	}
 	return e
 }
@@ -44,13 +55,13 @@ func (e Engine) Run() int {
 	if e.jq {
 		fmt.Printf("%s", e.query.StringGet())
 	} else if e.pretty {
-		s, _, err := e.manager.GetPretty(e.query)
+		s, _, _, err := e.manager.GetPretty(e.query, true)
 		if err != nil {
 			return 1
 		}
 		fmt.Printf("%s", s)
 	} else {
-		s, _, err := e.manager.Get(e.query)
+		s, _, _, err := e.manager.Get(e.query, true)
 		if err != nil {
 			return 1
 		}
@@ -67,20 +78,33 @@ func (e *Engine) render() bool {
 	}
 	defer termbox.Close()
 
-	keymode := false
-
 	var contents []string
+	var candidates []string
 	var c string
 
 	for {
-		//var flgFilter bool
-		if keymode {
-			contents = e.manager.GetCandidateKeys(e.query)
+		c, e.complete, candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+		e.queryConfirm = false
+		if e.keymode {
+			contents = candidates
 		} else {
-			c, e.complete, _ = e.manager.GetPretty(e.query)
 			contents = strings.Split(c, "\n")
 		}
-		e.draw(e.query.StringGet(), e.complete[0], contents)
+		if l := len(candidates); e.complete[0] == "" && l > 1 {
+			//e.candidatemode = true
+			if e.candidateidx >= l {
+				e.candidateidx = 0
+			}
+		} else {
+			e.candidatemode = false
+		}
+		if !e.candidatemode {
+			e.candidateidx = 0
+			candidates = []string{}
+		}
+
+		e.term.draw(e.query.StringGet(), e.complete[0], contents, candidates, e.candidateidx, e.contentOffset)
+
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
@@ -91,14 +115,27 @@ func (e *Engine) render() bool {
 			case termbox.KeyTab:
 				e.tabAction()
 			case termbox.KeyCtrlK:
-				keymode = !keymode
+				e.ctrlkAction()
+			case termbox.KeyCtrlJ:
+				e.ctrljAction()
+			case termbox.KeyCtrlL:
+				e.ctrllAction()
 			case termbox.KeySpace:
 				e.spaceAction()
 			case termbox.KeyCtrlW:
 				e.ctrlwAction()
+			case termbox.KeyEsc:
+				e.escAction()
 			case termbox.KeyEnter:
-				return true
-			case termbox.KeyEsc, termbox.KeyCtrlC:
+				if !e.candidatemode {
+					return true
+				}
+				_, _ = e.query.PopKeyword()
+				_ = e.query.StringAdd(".")
+				_ = e.query.StringAdd(candidates[e.candidateidx])
+				e.queryConfirm = true
+
+			case termbox.KeyCtrlC:
 				return false
 			default:
 			}
@@ -116,49 +153,41 @@ func (e *Engine) spaceAction() {
 func (e *Engine) backspaceAction() {
 	_ = e.query.Delete(1)
 }
-func (e *Engine) ctrlwAction() {
-	_, _ = e.query.PopKeyword()
-	_ = e.query.StringAdd(".")
+func (e *Engine) ctrljAction() {
+	e.contentOffset++
 }
-func (e *Engine) tabAction() {
-	if (e.complete[0] != e.complete[1]) && e.complete[0] != "" {
-		_, _ = e.query.PopKeyword()
+func (e *Engine) ctrlkAction() {
+	if o := e.contentOffset - 1; o >= 0 {
+		e.contentOffset = o
+	}
+}
+func (e *Engine) ctrllAction() {
+	e.keymode = !e.keymode
+}
+func (e *Engine) ctrlwAction() {
+	if k, _ := e.query.StringPopKeyword(); k != "" && !strings.Contains(k, "[") {
 		_ = e.query.StringAdd(".")
 	}
-	_ = e.query.StringAdd(e.complete[1])
+}
+func (e *Engine) tabAction() {
+	if !e.candidatemode {
+		e.candidatemode = true
+		if e.complete[0] != e.complete[1] && e.complete[0] != "" {
+			if k, _ := e.query.StringPopKeyword(); !strings.Contains(k, "[") {
+				_ = e.query.StringAdd(".")
+			}
+		}
+		if e.query.StringGet() == "" {
+			_ = e.query.StringAdd(".")
+		}
+		_ = e.query.StringAdd(e.complete[1])
+	} else {
+		e.candidateidx = e.candidateidx + 1
+	}
+}
+func (e *Engine) escAction() {
+	e.candidatemode = false
 }
 func (e *Engine) inputAction(ch rune) {
 	_ = e.query.StringAdd(string(ch))
-}
-
-func (e *Engine) draw(query string, complete string, rows []string) {
-
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-
-	fs := FilterPrompt + query
-	cs := complete
-	drawln(0, 0, fs+cs, []([]int){[]int{len(fs), len(fs) + len(cs)}})
-	termbox.SetCursor(len(fs), 0)
-
-	for idx, row := range rows {
-		drawln(0, idx+DefaultY, row, nil)
-	}
-
-	termbox.Flush()
-}
-
-func drawln(x int, y int, str string, matches [][]int) {
-	color := termbox.ColorDefault
-	backgroundColor := termbox.ColorDefault
-
-	var c termbox.Attribute
-	for i, s := range str {
-		c = color
-		for _, match := range matches {
-			if i >= match[0] && i < match[1] {
-				c = termbox.ColorGreen
-			}
-		}
-		termbox.SetCell(x+i, y, s, c, backgroundColor)
-	}
 }

@@ -44,11 +44,12 @@ func TestGet(t *testing.T) {
 	r := bytes.NewBufferString("{\"name\":\"go\"}")
 	jm, _ := NewJsonManager(r)
 	q := NewQueryWithString(".name")
-	result, suggest, err := jm.Get(q)
+	result, suggest, candidateKeys, err := jm.Get(q, false)
 
 	assert.Nil(err)
 	assert.Equal(`"go"`, result)
 	assert.Equal([]string{``, ``}, suggest)
+	assert.Equal([]string{}, candidateKeys)
 
 	// data
 	data := `{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`
@@ -57,7 +58,7 @@ func TestGet(t *testing.T) {
 
 	// case 2
 	q = NewQueryWithString(".abcde")
-	result, suggest, err = jm.Get(q)
+	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	//assert.Equal(`"2AA2"`, result)
 	assert.Equal(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`, result)
@@ -65,31 +66,31 @@ func TestGet(t *testing.T) {
 
 	// case 3
 	q = NewQueryWithString(".abcde_fgh")
-	result, suggest, err = jm.Get(q)
+	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, result)
 
 	// case 4
 	q = NewQueryWithString(".abcde_fgh.aaa[2]")
-	result, suggest, err = jm.Get(q)
+	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Equal(`[1,2]`, result)
 
 	// case 5
 	q = NewQueryWithString(".abcde_fgh.aaa[3]")
-	result, suggest, err = jm.Get(q)
+	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`null`, result)
 
 	// case 6
 	q = NewQueryWithString(".abcde_fgh.aa")
-	result, suggest, err = jm.Get(q)
+	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, result)
 	assert.Equal([]string{`a`, `aaa`}, suggest)
 
 	// case 7
 	q = NewQueryWithString(".abcde_fgh.ac")
-	result, suggest, err = jm.Get(q)
+	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`null`, result)
 	assert.Equal([]string{``, ``}, suggest)
@@ -101,7 +102,7 @@ func TestGetPretty(t *testing.T) {
 	r := bytes.NewBufferString("{\"name\":\"go\"}")
 	jm, _ := NewJsonManager(r)
 	q := NewQueryWithString(".name")
-	result, _, err := jm.GetPretty(q)
+	result, _, _, err := jm.GetPretty(q, true)
 
 	assert.Nil(err)
 	assert.Equal(`"go"`, result)
@@ -158,46 +159,48 @@ func TestGetFilteredData(t *testing.T) {
 	var assert = assert.New(t)
 
 	// data
-	data := `{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`
+	data := `{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"},"cc":{"a":[3,4]}}`
 	r := bytes.NewBufferString(data)
 	jm, _ := NewJsonManager(r)
 
 	// case 1
 	q := NewQueryWithString(".abcde")
-	result, s, err := jm.GetFilteredData(q)
+	result, s, c, err := jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ := result.Encode()
-	assert.Equal(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}}`, string(d))
+	assert.Equal(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"},"cc":{"a":[3,4]}}`, string(d))
 	//assert.Equal(`"2AA2"`, string(d))
 	assert.Equal([]string{``, `abcde`}, s)
+	assert.Equal([]string{"abcde", "abcde_fgh"}, c)
 
 	// case 2
 	q = NewQueryWithString(".abcde_fgh")
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, string(d))
-	assert.Equal([]string{`.`, `.`}, s)
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
 
 	// case 3
 	q = NewQueryWithString(".abcde_fgh.aaa[2]")
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`[1,2]`, string(d))
-	assert.Equal([]string{``, `[`}, s)
+	assert.Equal([]string{`[`, `[`}, s)
 
 	// case 4
 	q = NewQueryWithString(".abcde_fgh.aaa[3]")
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`null`, string(d))
-	assert.Equal([]string{``, `[`}, s)
+	assert.Equal([]string{``, ``}, s)
 
 	// case 5
 	q = NewQueryWithString(".abcde_fgh.aaa")
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`[123,"cccc",[1,2]]`, string(d))
@@ -205,7 +208,7 @@ func TestGetFilteredData(t *testing.T) {
 
 	// case 6
 	q = NewQueryWithString(".abcde_fgh.aa")
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, string(d))
@@ -213,11 +216,41 @@ func TestGetFilteredData(t *testing.T) {
 
 	// case 7
 	q = NewQueryWithString(".abcde_fgh.aaa[")
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`[123,"cccc",[1,2]]`, string(d))
 	assert.Equal([]string{``, `[`}, s)
+
+	// case 8
+	q = NewQueryWithString(".")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"},"cc":{"a":[3,4]}}`, string(d))
+	assert.Equal([]string{``, ``}, s)
+
+	// case 9
+	q = NewQueryWithString(".cc.")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"a":[3,4]}`, string(d))
+	assert.Equal([]string{`a`, `a`}, s)
+	assert.Equal([]string{"a"}, c)
+
+	// case 2-1
+	data = `{"arraytest":[{"aaa":123,"aab":234},[1,2]]}`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	q = NewQueryWithString(".arraytest[0]")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"aaa":123,"aab":234}`, string(d))
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
 }
 
 func TestGetFilteredDataWithMatchQuery(t *testing.T) {
@@ -228,25 +261,56 @@ func TestGetFilteredDataWithMatchQuery(t *testing.T) {
 	jm, _ := NewJsonManager(r)
 
 	q := NewQueryWithString(`.name`)
-	result, s, err := jm.GetFilteredData(q)
+	result, s, c, err := jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ := result.Encode()
 	assert.Equal(`[1,2,3]`, string(d))
 	assert.Equal([]string{"[", "["}, s)
+	assert.Equal([]string{}, c)
 
 	q = NewQueryWithString(`.naming`)
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"account":"simeji"}`, string(d))
-	assert.Equal([]string{".", "."}, s)
+	assert.Equal([]string{"account", "account"}, s)
+	assert.Equal([]string{}, c)
 
 	q = NewQueryWithString(`.test`)
-	result, s, err = jm.GetFilteredData(q)
+	result, s, c, err = jm.GetFilteredData(q, false)
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"name":[1,2,3],"naming":{"account":"simeji"},"test":"simeji","testing":"ok"}`, string(d))
 	assert.Equal([]string{"", "test"}, s)
+	assert.Equal([]string{"test", "testing"}, c)
+}
+
+func TestGetCandidateKeys(t *testing.T) {
+	var assert = assert.New(t)
+	data := `{"name":[1,2,3], "naming":{"account":"simeji"}, "test":"simeji", "testing":"ok"}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	q := NewQueryWithString(`.n`)
+
+	keys := jm.GetCandidateKeys(q)
+	assert.Equal([]string{"name", "naming"}, keys)
+
+	q = NewQueryWithString(`.`)
+	keys = jm.GetCandidateKeys(q)
+	assert.Equal([]string{"name", "naming", "test", "testing"}, keys)
+
+	q = NewQueryWithString(`.test`)
+	keys = jm.GetCandidateKeys(q)
+	assert.Equal([]string{"test", "testing"}, keys)
+
+	q = NewQueryWithString(`.testi`)
+	keys = jm.GetCandidateKeys(q)
+	assert.Equal([]string{"testing"}, keys)
+
+	q = NewQueryWithString(`.testia`)
+	keys = jm.GetCandidateKeys(q)
+	assert.Equal([]string{}, keys)
 }
 
 func TestGetCurrentKeys(t *testing.T) {

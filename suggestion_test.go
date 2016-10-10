@@ -15,12 +15,14 @@ func TestNewSuggestion(t *testing.T) {
 
 func TestSuggestionGet(t *testing.T) {
 	var assert = assert.New(t)
-	j := createJson(`{"name":"simeji-github", "naming":"simeji", "nickname":"simejisimeji"}`)
+	j := createJson(`{"name":"simeji-github"}`)
 	s := NewSuggestion()
+
+	j = createJson(`{"name":"simeji-github", "naming":"simeji", "nickname":"simejisimeji"}`)
 	assert.Equal([]string{"m", "nam"}, s.Get(j, "na"))
 
 	j = createJson(`{"abcde":"simeji-github", "abcdef":"simeji", "ab":"simejisimeji"}`)
-	assert.Equal([]string{".", "."}, s.Get(j, ""))
+	assert.Equal([]string{"", ""}, s.Get(j, ""))
 	assert.Equal([]string{"b", "ab"}, s.Get(j, "a"))
 	assert.Equal([]string{"de", "abcde"}, s.Get(j, "abc"))
 	assert.Equal([]string{"", "abcde"}, s.Get(j, "abcde"))
@@ -32,8 +34,16 @@ func TestSuggestionGet(t *testing.T) {
 
 	j = createJson(`["zero", "one"]`)
 	assert.Equal([]string{"[", "["}, s.Get(j, ""))
-
 	assert.Equal([]string{"", "["}, s.Get(j, "["))
+	assert.Equal([]string{"]", "[0]"}, s.Get(j, "[0"))
+
+	j = createJson(`{"Abcabc":"simeji-github", "Abcdef":"simeji"}`)
+	assert.Equal([]string{"bc", "Abc"}, s.Get(j, "a"))
+	assert.Equal([]string{"c", "Abc"}, s.Get(j, "ab"))
+
+	j = createJson(`{"RootDeviceNames":"simeji-github", "RootDeviceType":"simeji"}`)
+	assert.Equal([]string{"ootDevice", "RootDevice"}, s.Get(j, "r"))
+	assert.Equal([]string{"ootDevice", "RootDevice"}, s.Get(j, "R"))
 }
 
 func TestSuggestionGetCurrentType(t *testing.T) {
@@ -56,9 +66,16 @@ func TestSuggestionGetCandidateKeys(t *testing.T) {
 	assert.Equal([]string{"city", "name", "naming", "nickname"}, s.GetCandidateKeys(j, ""))
 	assert.Equal([]string{"name", "naming", "nickname"}, s.GetCandidateKeys(j, "n"))
 	assert.Equal([]string{"name", "naming"}, s.GetCandidateKeys(j, "na"))
+	assert.Equal([]string{}, s.GetCandidateKeys(j, "nana"))
 
 	j = createJson(`{"abcde":"simeji-github", "abcdef":"simeji", "ab":"simejisimeji"}`)
 	assert.Equal([]string{"abcde", "abcdef"}, s.GetCandidateKeys(j, "abcde"))
+
+	j = createJson(`{"name":"simeji-github"}`)
+	assert.Equal([]string{"name"}, s.GetCandidateKeys(j, ""))
+
+	j = createJson(`{"n":"simeji-github"}`)
+	assert.Equal([]string{"n"}, s.GetCandidateKeys(j, ""))
 
 	j = createJson(`[1,2,"aa"]`)
 	s = NewSuggestion()

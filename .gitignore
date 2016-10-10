@@ -23,6 +23,8 @@ _testmain.go
 *.test
 *.prof
 *.swp
+*.test
+test.*
 
 # jig package
 jig
