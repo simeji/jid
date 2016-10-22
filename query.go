@@ -50,17 +50,41 @@ func (q *Query) Set(query []rune) []rune {
 	return q.Get()
 }
 
+func (q *Query) Insert(query []rune, idx int) []rune {
+	qq := q.Get()
+	if idx == 0 {
+		qq = append(query, qq...)
+	} else if idx > 0 && len(qq) >= idx {
+		_q := make([]rune, idx+len(query)-1)
+		copy(_q, qq[:idx])
+		qq = append(append(_q, query...), qq[idx:]...)
+	}
+	return q.Set(qq)
+}
+
+func (q *Query) StringInsert(query string, idx int) string {
+	return string(q.Insert([]rune(query), idx))
+}
+
 func (q *Query) Add(query []rune) []rune {
 	return q.Set(append(q.Get(), query...))
 }
 
 func (q *Query) Delete(i int) []rune {
 	qq := q.Get()
-	newLastIdx := len(qq) - i
-	if newLastIdx < 0 {
-		newLastIdx = 0
+	lastIdx := len(qq)
+	if i < 0 {
+		if lastIdx+i >= 0 {
+			qq = qq[0 : lastIdx+i]
+		} else {
+			qq = qq[0:0]
+		}
+	} else if i == 0 {
+		qq = qq[1:]
+	} else if i > 0 && i < lastIdx {
+		qq = append(qq[:i], qq[i+1:]...)
 	}
-	return q.Set(qq[0:newLastIdx])
+	return q.Set(qq)
 }
 
 func (q *Query) Clear() []rune {

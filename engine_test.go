@@ -34,8 +34,9 @@ func TestBackSpaceAction(t *testing.T) {
 	r := bytes.NewBufferString(`{"name":"go"}`)
 	e := NewEngine(r, false, false)
 	e.query.StringSet(".name")
+	e.cursorOffsetX = 5
 
-	e.backspaceAction()
+	e.deleteChar()
 	assert.Equal(".nam", e.query.StringGet())
 }
 
@@ -132,6 +133,7 @@ func TestInputAction(t *testing.T) {
 	r := bytes.NewBufferString(`{"name":"go"}`)
 	e := NewEngine(r, false, false)
 	e.query.StringSet(".name")
+	e.cursorOffsetX = len(e.query.Get())
 
 	e.inputAction('n')
 	assert.Equal(".namen", e.query.StringGet())

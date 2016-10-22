@@ -97,6 +97,30 @@ func TestQueryAdd(t *testing.T) {
 
 	assert.Equal(q.Add([]rune("world")), []rune(".helloworld"))
 }
+func TestQueryInsert(t *testing.T) {
+	var assert = assert.New(t)
+	v := []rune(".hello.world")
+	q := NewQuery(v)
+
+	assert.Equal([]rune(".hello.world"), q.Insert([]rune("w"), 0))
+	assert.Equal([]rune(".whello.world"), q.Insert([]rune("w"), 1))
+	assert.Equal([]rune(".wwhello.world"), q.Insert([]rune("w"), 1))
+	assert.Equal([]rune(".wwhello.world"), q.Insert([]rune("."), 1))
+	assert.Equal([]rune(".wwh.ello.world"), q.Insert([]rune("."), 4))
+	assert.Equal([]rune(".wwh.ello.world"), q.Insert([]rune("a"), 20))
+}
+func TestQueryStringInsert(t *testing.T) {
+	var assert = assert.New(t)
+	q := NewQueryWithString(".hello.world")
+
+	assert.Equal(".hello.world", q.StringInsert("w", 0))
+	assert.Equal(".whello.world", q.StringInsert("w", 1))
+	assert.Equal(".wwhello.world", q.StringInsert("w", 1))
+	assert.Equal(".wwhello.world", q.StringInsert(".", 1))
+	assert.Equal(".wwh.ello.world", q.StringInsert(".", 4))
+	assert.Equal(".wwh.ello.worlda", q.StringInsert("a", 15))
+	assert.Equal(".wwh.ello.worlda", q.StringInsert("a", 20))
+}
 
 func TestQueryClear(t *testing.T) {
 	var assert = assert.New(t)
@@ -113,10 +137,19 @@ func TestQueryDelete(t *testing.T) {
 	v := []rune(".helloworld")
 	q := NewQuery(v)
 
-	assert.Equal(q.Delete(1), []rune(".helloworl"))
-	assert.Equal(q.Delete(1), []rune(".hellowor"))
-	assert.Equal(q.Delete(2), []rune(".hellow"))
-	assert.Equal(q.Delete(8), []rune(""))
+	assert.Equal([]rune(".helloworl"), q.Delete(-1))
+	assert.Equal([]rune(".hellowor"), q.Delete(-1))
+	assert.Equal([]rune(".hellow"), q.Delete(-2))
+	assert.Equal([]rune(""), q.Delete(-8))
+
+	q = NewQuery([]rune(".hello.world"))
+	assert.Equal([]rune(".hello.world"), q.Delete(0))
+	assert.Equal([]rune(".ello.world"), q.Delete(1))
+	assert.Equal([]rune(".llo.world"), q.Delete(1))
+	assert.Equal([]rune(".llo.world"), q.Delete(0))
+	assert.Equal([]rune(".ll.world"), q.Delete(3))
+	assert.Equal([]rune(".llworld"), q.Delete(3))
+	assert.Equal([]rune(".llorld"), q.Delete(3))
 }
 
 func TestGetKeywords(t *testing.T) {
