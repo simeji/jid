@@ -24,6 +24,7 @@ type Engine struct {
 	candidateidx  int
 	contentOffset int
 	queryConfirm  bool
+	cursorOffsetX int
 }
 
 func NewEngine(s io.Reader, q bool, p bool) *Engine {
@@ -43,6 +44,7 @@ func NewEngine(s io.Reader, q bool, p bool) *Engine {
 		candidateidx:  0,
 		contentOffset: 0,
 		queryConfirm:  false,
+		cursorOffsetX: 0,
 	}
 	return e
 }
@@ -103,7 +105,17 @@ func (e *Engine) render() bool {
 			candidates = []string{}
 		}
 
-		e.term.draw(e.query.StringGet(), e.complete[0], contents, candidates, e.candidateidx, e.contentOffset)
+		ta := &TerminalDrawAttributes{
+			Query:           e.query.StringGet(),
+			CursorOffsetX:   e.cursorOffsetX,
+			Contents:        contents,
+			CandidateIndex:  e.candidateidx,
+			ContentsOffsetY: e.contentOffset,
+			Complete:        e.complete[0],
+			Candidates:      candidates,
+		}
+
+		e.term.draw(ta)
 
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
@@ -111,9 +123,17 @@ func (e *Engine) render() bool {
 			case 0:
 				e.inputAction(ev.Ch)
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
-				e.backspaceAction()
+				e.deleteChar()
 			case termbox.KeyTab:
 				e.tabAction()
+			case termbox.KeyArrowLeft, termbox.KeyCtrlB:
+				e.moveCursorBackward()
+			case termbox.KeyArrowRight, termbox.KeyCtrlF:
+				e.moveCursorForward()
+			case termbox.KeyHome, termbox.KeyCtrlA:
+				e.moveCursorToTop()
+			case termbox.KeyEnd, termbox.KeyCtrlE:
+				e.moveCursorToEnd()
 			case termbox.KeyCtrlK:
 				e.ctrlkAction()
 			case termbox.KeyCtrlJ:
@@ -132,7 +152,8 @@ func (e *Engine) render() bool {
 				}
 				_, _ = e.query.PopKeyword()
 				_ = e.query.StringAdd(".")
-				_ = e.query.StringAdd(candidates[e.candidateidx])
+				q := e.query.StringAdd(candidates[e.candidateidx])
+				e.cursorOffsetX = len(q)
 				e.queryConfirm = true
 
 			case termbox.KeyCtrlC:
@@ -150,8 +171,11 @@ func (e *Engine) render() bool {
 func (e *Engine) spaceAction() {
 	_ = e.query.StringAdd(" ")
 }
-func (e *Engine) backspaceAction() {
-	_ = e.query.Delete(1)
+func (e *Engine) deleteChar() {
+	if e.cursorOffsetX > 0 {
+		_ = e.query.Delete(e.cursorOffsetX - 1)
+		e.cursorOffsetX -= 1
+	}
 }
 func (e *Engine) ctrljAction() {
 	e.contentOffset++
@@ -168,6 +192,7 @@ func (e *Engine) ctrlwAction() {
 	if k, _ := e.query.StringPopKeyword(); k != "" && !strings.Contains(k, "[") {
 		_ = e.query.StringAdd(".")
 	}
+	e.cursorOffsetX = len(e.query.Get())
 }
 func (e *Engine) tabAction() {
 	if !e.candidatemode {
@@ -184,10 +209,36 @@ func (e *Engine) tabAction() {
 	} else {
 		e.candidateidx = e.candidateidx + 1
 	}
+	e.cursorOffsetX = len(e.query.Get())
 }
 func (e *Engine) escAction() {
 	e.candidatemode = false
 }
 func (e *Engine) inputAction(ch rune) {
-	_ = e.query.StringAdd(string(ch))
+	b := len(e.query.Get())
+	q := e.query.StringInsert(string(ch), e.cursorOffsetX)
+	if b < len(q) {
+		e.cursorOffsetX += 1
+	}
+}
+
+func (e *Engine) moveCursorBackward() {
+	if e.cursorOffsetX > 0 {
+		e.cursorOffsetX -= 1
+	}
+}
+func (e *Engine) moveCursorForward() {
+	if len(e.query.Get()) > e.cursorOffsetX {
+		e.cursorOffsetX += 1
+	}
+}
+func (e *Engine) moveCursorWordBackwark() {
+}
+func (e *Engine) moveCursorWordForward() {
+}
+func (e *Engine) moveCursorToTop() {
+	e.cursorOffsetX = 0
+}
+func (e *Engine) moveCursorToEnd() {
+	e.cursorOffsetX = len(e.query.Get())
 }

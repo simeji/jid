@@ -6,20 +6,35 @@ import (
 )
 
 type Terminal struct {
-	defaultY  int
-	prompt    string
-	cursorPos []int
+	defaultY int
+	prompt   string
+}
+
+type TerminalDrawAttributes struct {
+	Query           string
+	CursorOffsetX   int
+	Contents        []string
+	CandidateIndex  int
+	ContentsOffsetY int
+	Complete        string
+	Candidates      []string
 }
 
 func NewTerminal(prompt string, defaultY int) *Terminal {
 	return &Terminal{
-		prompt:    prompt,
-		defaultY:  defaultY,
-		cursorPos: []int{0, 0},
+		prompt:   prompt,
+		defaultY: defaultY,
 	}
 }
 
-func (t *Terminal) draw(query string, complete string, rows []string, candidates []string, candidateidx int, contentOffsetY int) {
+func (t *Terminal) draw(attr *TerminalDrawAttributes) {
+
+	query := attr.Query
+	complete := attr.Complete
+	rows := attr.Contents
+	candidates := attr.Candidates
+	candidateidx := attr.CandidateIndex
+	contentOffsetY := attr.ContentsOffsetY
 
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
@@ -28,8 +43,6 @@ func (t *Terminal) draw(query string, complete string, rows []string, candidates
 	y := t.defaultY
 
 	t.drawln(0, 0, fs+cs, []([]int){[]int{len(fs), len(fs) + len(cs)}})
-	t.cursorPos = []int{len(fs), 0}
-	termbox.SetCursor(t.cursorPos[0], t.cursorPos[1])
 
 	if len(candidates) > 0 {
 		y = t.drawCandidates(0, t.defaultY, candidateidx, candidates)
@@ -40,6 +53,7 @@ func (t *Terminal) draw(query string, complete string, rows []string, candidates
 			t.drawln(0, i+y, row, nil)
 		}
 	}
+	termbox.SetCursor(len(t.prompt)+attr.CursorOffsetX, 0)
 
 	termbox.Flush()
 }
