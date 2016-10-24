@@ -70,6 +70,7 @@ curl -s http://rdg.afilias.info/rdap/domain/example.info | jig
 |key|description|
 |:-----------|:----------|
 |`TAB` / `CTRL` + `I` |Show available items and choice them|
+|`CTRL` + `W` |Delete from the cursor to the start of the word|
 |`CTRL` + `F` / Right Arrow (:arrow_right:)|To the first character of the 'Filter'|
 |`CTRL` + `B` / Left Arrow (:arrow_left:)|To the end of the 'Filter'|
 |`CTRL` + `A`|To the first character of the 'Filter'|
