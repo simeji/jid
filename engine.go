@@ -93,7 +93,6 @@ func (e *Engine) render() bool {
 			contents = strings.Split(c, "\n")
 		}
 		if l := len(candidates); e.complete[0] == "" && l > 1 {
-			//e.candidatemode = true
 			if e.candidateidx >= l {
 				e.candidateidx = 0
 			}
@@ -121,7 +120,7 @@ func (e *Engine) render() bool {
 		case termbox.EventKey:
 			switch ev.Key {
 			case 0:
-				e.inputAction(ev.Ch)
+				e.inputChar(ev.Ch)
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				e.deleteChar()
 			case termbox.KeyTab:
@@ -135,27 +134,20 @@ func (e *Engine) render() bool {
 			case termbox.KeyEnd, termbox.KeyCtrlE:
 				e.moveCursorToEnd()
 			case termbox.KeyCtrlK:
-				e.ctrlkAction()
+				e.scrollToAbove()
 			case termbox.KeyCtrlJ:
-				e.ctrljAction()
+				e.scrollToBelow()
 			case termbox.KeyCtrlL:
-				e.ctrllAction()
-			case termbox.KeySpace:
-				e.spaceAction()
+				e.toggleKeymode()
 			case termbox.KeyCtrlW:
-				e.ctrlwAction()
+				e.deleteWordBackward()
 			case termbox.KeyEsc:
-				e.escAction()
+				e.escapeCandidateMode()
 			case termbox.KeyEnter:
 				if !e.candidatemode {
 					return true
 				}
-				_, _ = e.query.PopKeyword()
-				_ = e.query.StringAdd(".")
-				q := e.query.StringAdd(candidates[e.candidateidx])
-				e.cursorOffsetX = len(q)
-				e.queryConfirm = true
-
+				e.confirmCandidate(candidates)
 			case termbox.KeyCtrlC:
 				return false
 			default:
@@ -168,27 +160,32 @@ func (e *Engine) render() bool {
 	}
 }
 
-func (e *Engine) spaceAction() {
-	_ = e.query.StringAdd(" ")
+func (e *Engine) confirmCandidate(candidates []string) {
+	_, _ = e.query.PopKeyword()
+	_ = e.query.StringAdd(".")
+	q := e.query.StringAdd(candidates[e.candidateidx])
+	e.cursorOffsetX = len(q)
+	e.queryConfirm = true
 }
+
 func (e *Engine) deleteChar() {
 	if e.cursorOffsetX > 0 {
 		_ = e.query.Delete(e.cursorOffsetX - 1)
 		e.cursorOffsetX -= 1
 	}
 }
-func (e *Engine) ctrljAction() {
+func (e *Engine) scrollToBelow() {
 	e.contentOffset++
 }
-func (e *Engine) ctrlkAction() {
+func (e *Engine) scrollToAbove() {
 	if o := e.contentOffset - 1; o >= 0 {
 		e.contentOffset = o
 	}
 }
-func (e *Engine) ctrllAction() {
+func (e *Engine) toggleKeymode() {
 	e.keymode = !e.keymode
 }
-func (e *Engine) ctrlwAction() {
+func (e *Engine) deleteWordBackward() {
 	if k, _ := e.query.StringPopKeyword(); k != "" && !strings.Contains(k, "[") {
 		_ = e.query.StringAdd(".")
 	}
@@ -211,10 +208,10 @@ func (e *Engine) tabAction() {
 	}
 	e.cursorOffsetX = len(e.query.Get())
 }
-func (e *Engine) escAction() {
+func (e *Engine) escapeCandidateMode() {
 	e.candidatemode = false
 }
-func (e *Engine) inputAction(ch rune) {
+func (e *Engine) inputChar(ch rune) {
 	b := len(e.query.Get())
 	q := e.query.StringInsert(string(ch), e.cursorOffsetX)
 	if b < len(q) {

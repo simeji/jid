@@ -19,17 +19,7 @@ func TestNewEngine(t *testing.T) {
 	assert.NotEqual(e, &Engine{}, "they should be not equal")
 }
 
-func TestSpaceAction(t *testing.T) {
-	var assert = assert.New(t)
-	r := bytes.NewBufferString(`{"name":"go"}`)
-	e := NewEngine(r, false, false)
-	e.query.StringSet(".name")
-
-	e.spaceAction()
-	assert.Equal(".name ", e.query.StringGet())
-}
-
-func TestBackSpaceAction(t *testing.T) {
+func TestDeleteChar(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go"}`)
 	e := NewEngine(r, false, false)
@@ -38,48 +28,52 @@ func TestBackSpaceAction(t *testing.T) {
 
 	e.deleteChar()
 	assert.Equal(".nam", e.query.StringGet())
+	assert.Equal(4, e.cursorOffsetX)
 }
 
-func TestCtrlwAction(t *testing.T) {
+func TestDeleteWordBackward(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go"}`)
 	e := NewEngine(r, false, false)
 	e.query.StringSet(".name")
 
-	e.ctrlwAction()
+	e.deleteWordBackward()
 	assert.Equal(".", e.query.StringGet())
+	assert.Equal(1, e.cursorOffsetX)
 
 	e.query.StringSet(".name[1]")
-	e.ctrlwAction()
+	e.deleteWordBackward()
 	assert.Equal(".name", e.query.StringGet())
+	assert.Equal(5, e.cursorOffsetX)
 
 	e.query.StringSet(".name[")
-	e.ctrlwAction()
+	e.deleteWordBackward()
 	assert.Equal(".name", e.query.StringGet())
+	assert.Equal(5, e.cursorOffsetX)
 }
 
-func TestCtrlKAction(t *testing.T) {
+func Test(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go","NameTest":[1,2,3]}`)
 	e := NewEngine(r, false, false)
 	assert.Equal(0, e.contentOffset)
-	e.ctrlkAction()
+	e.scrollToAbove()
 	assert.Equal(0, e.contentOffset)
 	e.contentOffset = 5
-	e.ctrlkAction()
+	e.scrollToAbove()
 	assert.Equal(4, e.contentOffset)
-	e.ctrlkAction()
+	e.scrollToAbove()
 	assert.Equal(3, e.contentOffset)
 }
 
-func TestCtrlJAction(t *testing.T) {
+func TestScrollToBelow(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go","NameTest":[1,2,3]}`)
 	e := NewEngine(r, false, false)
-	e.ctrljAction()
+	e.scrollToBelow()
 	assert.Equal(1, e.contentOffset)
-	e.ctrljAction()
-	e.ctrljAction()
+	e.scrollToBelow()
+	e.scrollToBelow()
 	assert.Equal(3, e.contentOffset)
 }
 
@@ -88,9 +82,9 @@ func TestCtrllAction(t *testing.T) {
 	r := bytes.NewBufferString(`{"name":"go","NameTest":[1,2,3]}`)
 	e := NewEngine(r, false, false)
 	assert.False(e.keymode)
-	e.ctrllAction()
+	e.toggleKeymode()
 	assert.True(e.keymode)
-	e.ctrllAction()
+	e.toggleKeymode()
 	assert.False(e.keymode)
 }
 
@@ -121,23 +115,39 @@ func TestEscAction(t *testing.T) {
 	r := bytes.NewBufferString(`{"name":"go","NameTest":[1,2,3]}`)
 	e := NewEngine(r, false, false)
 	assert.False(e.candidatemode)
-	e.escAction()
+	e.escapeCandidateMode()
 	assert.False(e.candidatemode)
 	e.candidatemode = true
-	e.escAction()
+	e.escapeCandidateMode()
 	assert.False(e.candidatemode)
 }
 
-func TestInputAction(t *testing.T) {
+func TestConfirmCandidate(t *testing.T) {
+	var assert = assert.New(t)
+	r := bytes.NewBufferString(`{"name":"go"}`)
+	e := NewEngine(r, false, false)
+	e.query.StringSet(".name.hoge")
+	e.candidateidx = 1
+	e.confirmCandidate([]string{"aaa", "bbb", "ccc"})
+
+	assert.True(e.queryConfirm)
+	assert.Equal(9, e.cursorOffsetX)
+	assert.Equal(".name.bbb", e.query.StringGet())
+
+}
+func TestInputChar(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go"}`)
 	e := NewEngine(r, false, false)
 	e.query.StringSet(".name")
 	e.cursorOffsetX = len(e.query.Get())
+	assert.Equal(5, e.cursorOffsetX)
 
-	e.inputAction('n')
+	e.inputChar('n')
 	assert.Equal(".namen", e.query.StringGet())
+	assert.Equal(6, e.cursorOffsetX)
 
-	e.inputAction('.')
+	e.inputChar('.')
 	assert.Equal(".namen.", e.query.StringGet())
+	assert.Equal(7, e.cursorOffsetX)
 }
