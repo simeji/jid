@@ -8,6 +8,7 @@ import (
 type QueryInterface interface {
 	Get() []rune
 	Set(query []rune) []rune
+	Insert(query []rune, idx int) []rune
 	Add(query []rune) []rune
 	Delete(i int) []rune
 	Clear() []rune
@@ -16,6 +17,7 @@ type QueryInterface interface {
 	PopKeyword() ([]rune, []rune)
 	StringGet() string
 	StringSet(query string) string
+	StringInsert(query string, idx int) string
 	StringAdd(query string) string
 	StringGetKeywords() []string
 	StringGetLastKeyword() string

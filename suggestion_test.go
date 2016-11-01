@@ -56,6 +56,8 @@ func TestSuggestionGetCurrentType(t *testing.T) {
 	assert.Equal(MAP, s.GetCurrentType(j))
 	j = createJson(`"name"`)
 	assert.Equal(STRING, s.GetCurrentType(j))
+	j = createJson("1")
+	assert.Equal(UNKNOWN, s.GetCurrentType(j))
 }
 
 func TestSuggestionGetCandidateKeys(t *testing.T) {

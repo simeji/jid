@@ -1,7 +1,6 @@
 package jig
 
 import (
-	"fmt"
 	"github.com/nsf/termbox-go"
 	"io"
 	"strings"
@@ -16,7 +15,7 @@ type Engine struct {
 	manager       *JsonManager
 	jq            bool
 	pretty        bool
-	query         *Query
+	query         QueryInterface
 	term          *Terminal
 	complete      []string
 	keymode       bool
@@ -27,15 +26,17 @@ type Engine struct {
 	cursorOffsetX int
 }
 
-func NewEngine(s io.Reader, q bool, p bool) *Engine {
+type EngineInterface interface {
+	Run() EngineResultInterface
+}
+
+func NewEngine(s io.Reader) *Engine {
 	j, err := NewJsonManager(s)
 	if err != nil {
 		return &Engine{}
 	}
 	e := &Engine{
 		manager:       j,
-		jq:            q,
-		pretty:        p,
 		term:          NewTerminal(FilterPrompt, DefaultY),
 		query:         NewQuery([]rune("")),
 		complete:      []string{"", ""},
@@ -49,30 +50,30 @@ func NewEngine(s io.Reader, q bool, p bool) *Engine {
 	return e
 }
 
-func (e Engine) Run() int {
-
-	if !e.render() {
-		return 2
-	}
-	if e.jq {
-		fmt.Printf("%s", e.query.StringGet())
-	} else if e.pretty {
-		s, _, _, err := e.manager.GetPretty(e.query, true)
-		if err != nil {
-			return 1
-		}
-		fmt.Printf("%s", s)
-	} else {
-		s, _, _, err := e.manager.Get(e.query, true)
-		if err != nil {
-			return 1
-		}
-		fmt.Printf("%s", s)
-	}
-	return 0
+type EngineResultInterface interface {
+	GetQuery() string
+	GetContent() string
+	GetError() error
 }
 
-func (e *Engine) render() bool {
+type EngineResult struct {
+	content string
+	qs      string
+	err     error
+}
+
+func (er *EngineResult) GetQueryString() string {
+	return er.qs
+}
+
+func (er *EngineResult) GetContent() string {
+	return er.content
+}
+func (er *EngineResult) GetError() string {
+	return er.err
+}
+
+func (e *Engine) Run() EngineResult {
 
 	err := termbox.Init()
 	if err != nil {
@@ -146,10 +147,14 @@ func (e *Engine) render() bool {
 			case termbox.KeyEnter:
 				if !e.candidatemode {
 					return true
+					return &EngineResult{
+						content: //json not prettry
+						err:  nil
+					}
 				}
 				e.confirmCandidate(candidates)
 			case termbox.KeyCtrlC:
-				return false
+				return &EngineResult{}
 			default:
 			}
 		case termbox.EventError:
