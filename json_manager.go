@@ -82,7 +82,11 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 		if j, exist := getItem(json, lastKeyword); exist && (confirm || candidateNum == 1) {
 			json = j
 			candidateKeys = []string{}
-			suggest = jm.suggestion.Get(json, "")
+			if _, err := json.Array(); err == nil {
+				suggest = jm.suggestion.Get(json, "")
+			} else {
+				suggest = []string{"", ""}
+			}
 		} else if candidateNum < 1 {
 			json = j
 			suggest = jm.suggestion.Get(json, "")
