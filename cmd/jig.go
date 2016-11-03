@@ -30,11 +30,11 @@ func run(e jig.EngineInterface, query bool, pretty bool) int {
 	if query {
 		fmt.Printf("%s", result.GetQueryString())
 	} else if pretty {
-		s, _, _, err := e.manager.GetPretty(e.query, true)
-		if err != nil {
-			return 1
-		}
-		fmt.Printf("%s", s)
+		//s, _, _, err := e.manager.GetPretty(e.query, true)
+		//if err != nil {
+		//return 1
+		//}
+		//fmt.Printf("%s", s)
 	} else {
 		s := result.GetContent()
 		fmt.Printf("%s", s)

@@ -11,10 +11,19 @@ const (
 	FilterPrompt string = "[Filter]> "
 )
 
+type EngineInterface interface {
+	Run() EngineResultInterface
+	GetQuery() QueryInterface
+}
+
+type EngineResultInterface interface {
+	GetQueryString() string
+	GetContent() string
+	GetError() error
+}
+
 type Engine struct {
 	manager       *JsonManager
-	jq            bool
-	pretty        bool
 	query         QueryInterface
 	term          *Terminal
 	complete      []string
@@ -26,11 +35,7 @@ type Engine struct {
 	cursorOffsetX int
 }
 
-type EngineInterface interface {
-	Run() EngineResultInterface
-}
-
-func NewEngine(s io.Reader) *Engine {
+func NewEngine(s io.Reader) EngineInterface {
 	j, err := NewJsonManager(s)
 	if err != nil {
 		return &Engine{}
@@ -50,12 +55,6 @@ func NewEngine(s io.Reader) *Engine {
 	return e
 }
 
-type EngineResultInterface interface {
-	GetQuery() string
-	GetContent() string
-	GetError() error
-}
-
 type EngineResult struct {
 	content string
 	qs      string
@@ -69,11 +68,15 @@ func (er *EngineResult) GetQueryString() string {
 func (er *EngineResult) GetContent() string {
 	return er.content
 }
-func (er *EngineResult) GetError() string {
+func (er *EngineResult) GetError() error {
 	return er.err
 }
 
-func (e *Engine) Run() EngineResult {
+func (e *Engine) GetQuery() QueryInterface {
+	return e.query
+}
+
+func (e *Engine) Run() EngineResultInterface {
 
 	err := termbox.Init()
 	if err != nil {
@@ -146,10 +149,10 @@ func (e *Engine) Run() EngineResult {
 				e.escapeCandidateMode()
 			case termbox.KeyEnter:
 				if !e.candidatemode {
-					return true
+					cc, _, _, err := e.manager.Get(e.query, true)
 					return &EngineResult{
-						content: //json not prettry
-						err:  nil
+						content: cc,
+						err:     err,
 					}
 				}
 				e.confirmCandidate(candidates)
