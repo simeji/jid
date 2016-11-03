@@ -69,6 +69,7 @@ func TestGet(t *testing.T) {
 	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, result)
+	assert.Equal([]string{``, ``}, suggest)
 
 	// case 4
 	q = NewQueryWithString(".abcde_fgh.aaa[2]")
@@ -93,6 +94,18 @@ func TestGet(t *testing.T) {
 	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`null`, result)
+	assert.Equal([]string{``, ``}, suggest)
+
+	// data
+	data = `{"abc":"2AA2","def":{"aaa":"bbb"}}`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	// case 2
+	q = NewQueryWithString(".def")
+	result, suggest, candidateKeys, err = jm.Get(q, false)
+	assert.Nil(err)
+	assert.Equal(`{"aaa":"bbb"}`, result)
 	assert.Equal([]string{``, ``}, suggest)
 }
 
@@ -251,6 +264,19 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Equal(`{"aaa":123,"aab":234}`, string(d))
 	assert.Equal([]string{``, ``}, s)
 	assert.Equal([]string{}, c)
+
+	// case 3-1
+	data = `{"aa":"abcde","bb":{"foo":"bar"}}`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	q = NewQueryWithString(".bb")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"foo":"bar"}`, string(d))
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
 }
 
 func TestGetFilteredDataWithMatchQuery(t *testing.T) {
@@ -273,8 +299,16 @@ func TestGetFilteredDataWithMatchQuery(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"account":"simeji"}`, string(d))
-	assert.Equal([]string{"account", "account"}, s)
+	assert.Equal([]string{"", ""}, s)
 	assert.Equal([]string{}, c)
+
+	q = NewQueryWithString(`.naming.`)
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"account":"simeji"}`, string(d))
+	assert.Equal([]string{"account", "account"}, s)
+	assert.Equal([]string{"account"}, c)
 
 	q = NewQueryWithString(`.test`)
 	result, s, c, err = jm.GetFilteredData(q, false)
