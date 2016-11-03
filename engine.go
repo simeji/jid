@@ -89,6 +89,7 @@ func (e *Engine) Run() EngineResultInterface {
 	var c string
 
 	for {
+		///
 		c, e.complete, candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
 		e.queryConfirm = false
 		if e.keymode {
@@ -107,6 +108,7 @@ func (e *Engine) Run() EngineResultInterface {
 			e.candidateidx = 0
 			candidates = []string{}
 		}
+		///
 
 		ta := &TerminalDrawAttributes{
 			Query:           e.query.StringGet(),
