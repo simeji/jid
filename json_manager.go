@@ -66,7 +66,9 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 	keywords := q.StringGetKeywords()
 
 	idx := 0
-	if l := len(keywords); l > 0 {
+	if l := len(keywords); l == 0 {
+		return json, []string{"", ""}, []string{}, nil
+	} else if l > 0 {
 		idx = l - 1
 	}
 	for _, keyword := range keywords[0:idx] {
@@ -106,6 +108,11 @@ func getItem(json *simplejson.Json, s string) (*simplejson.Json, bool) {
 	re := regexp.MustCompile(`\[([0-9]+)\]`)
 	matches := re.FindStringSubmatch(s)
 
+	if s == "" {
+		return json, false
+	}
+
+	// Query include [
 	if len(matches) > 0 {
 		index, _ := strconv.Atoi(matches[1])
 		if a, err := json.Array(); err != nil {
