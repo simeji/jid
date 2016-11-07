@@ -320,6 +320,7 @@ func TestGetFilteredData(t *testing.T) {
 	d, _ = result.Encode()
 	assert.Equal([]string{``, `Private`}, s)
 	assert.Equal([]string{"PrivateAlias", "PrivateName"}, c)
+
 }
 
 func TestGetFilteredDataWithMatchQuery(t *testing.T) {

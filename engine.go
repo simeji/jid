@@ -28,6 +28,7 @@ type Engine struct {
 	term          *Terminal
 	complete      []string
 	keymode       bool
+	candidates    []string
 	candidatemode bool
 	candidateidx  int
 	contentOffset int
@@ -46,6 +47,7 @@ func NewEngine(s io.Reader) EngineInterface {
 		query:         NewQuery([]rune("")),
 		complete:      []string{"", ""},
 		keymode:       false,
+		candidates:    []string{},
 		candidatemode: false,
 		candidateidx:  0,
 		contentOffset: 0,
@@ -85,30 +87,11 @@ func (e *Engine) Run() EngineResultInterface {
 	defer termbox.Close()
 
 	var contents []string
-	var candidates []string
-	var c string
 
 	for {
-		///
-		c, e.complete, candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+		contents = e.getContents()
+		e.setCandidateData()
 		e.queryConfirm = false
-		if e.keymode {
-			contents = candidates
-		} else {
-			contents = strings.Split(c, "\n")
-		}
-		if l := len(candidates); e.complete[0] == "" && l > 1 {
-			if e.candidateidx >= l {
-				e.candidateidx = 0
-			}
-		} else {
-			e.candidatemode = false
-		}
-		if !e.candidatemode {
-			e.candidateidx = 0
-			candidates = []string{}
-		}
-		///
 
 		ta := &TerminalDrawAttributes{
 			Query:           e.query.StringGet(),
@@ -117,7 +100,7 @@ func (e *Engine) Run() EngineResultInterface {
 			CandidateIndex:  e.candidateidx,
 			ContentsOffsetY: e.contentOffset,
 			Complete:        e.complete[0],
-			Candidates:      candidates,
+			Candidates:      e.candidates,
 		}
 
 		e.term.draw(ta)
@@ -157,7 +140,7 @@ func (e *Engine) Run() EngineResultInterface {
 						err:     err,
 					}
 				}
-				e.confirmCandidate(candidates)
+				e.confirmCandidate()
 			case termbox.KeyCtrlC:
 				return &EngineResult{}
 			default:
@@ -170,10 +153,36 @@ func (e *Engine) Run() EngineResultInterface {
 	}
 }
 
-func (e *Engine) confirmCandidate(candidates []string) {
+func (e *Engine) getContents() []string {
+	var c string
+	var contents []string
+	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+	if e.keymode {
+		contents = e.candidates
+	} else {
+		contents = strings.Split(c, "\n")
+	}
+	return contents
+}
+
+func (e *Engine) setCandidateData() {
+	if l := len(e.candidates); e.complete[0] == "" && l > 1 {
+		if e.candidateidx >= l {
+			e.candidateidx = 0
+		}
+	} else {
+		e.candidatemode = false
+	}
+	if !e.candidatemode {
+		e.candidateidx = 0
+		e.candidates = []string{}
+	}
+}
+
+func (e *Engine) confirmCandidate() {
 	_, _ = e.query.PopKeyword()
 	_ = e.query.StringAdd(".")
-	q := e.query.StringAdd(candidates[e.candidateidx])
+	q := e.query.StringAdd(e.candidates[e.candidateidx])
 	e.cursorOffsetX = len(q)
 	e.queryConfirm = true
 }
@@ -204,15 +213,16 @@ func (e *Engine) deleteWordBackward() {
 func (e *Engine) tabAction() {
 	if !e.candidatemode {
 		e.candidatemode = true
-		if e.complete[0] != e.complete[1] && e.complete[0] != "" {
+		if e.query.StringGet() == "" {
+			_ = e.query.StringAdd(".")
+		} else if e.complete[0] != e.complete[1] && e.complete[0] != "" {
 			if k, _ := e.query.StringPopKeyword(); !strings.Contains(k, "[") {
 				_ = e.query.StringAdd(".")
 			}
+			_ = e.query.StringAdd(e.complete[1])
+		} else {
+			_ = e.query.StringAdd(e.complete[0])
 		}
-		if e.query.StringGet() == "" {
-			_ = e.query.StringAdd(".")
-		}
-		_ = e.query.StringAdd(e.complete[1])
 	} else {
 		e.candidateidx = e.candidateidx + 1
 	}
