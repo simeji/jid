@@ -69,6 +69,7 @@ func TestGet(t *testing.T) {
 	result, suggest, candidateKeys, err = jm.Get(q, false)
 	assert.Nil(err)
 	assert.Equal(`{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"}`, result)
+	assert.Equal([]string{``, ``}, suggest)
 
 	// case 4
 	q = NewQueryWithString(".abcde_fgh.aaa[2]")
@@ -94,6 +95,18 @@ func TestGet(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal(`null`, result)
 	assert.Equal([]string{``, ``}, suggest)
+
+	// data
+	data = `{"abc":"2AA2","def":{"aaa":"bbb"}}`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	// case 2
+	q = NewQueryWithString(".def")
+	result, suggest, candidateKeys, err = jm.Get(q, false)
+	assert.Nil(err)
+	assert.Equal(`{"aaa":"bbb"}`, result)
+	assert.Equal([]string{``, ``}, suggest)
 }
 
 func TestGetPretty(t *testing.T) {
@@ -111,13 +124,17 @@ func TestGetPretty(t *testing.T) {
 func TestGetItem(t *testing.T) {
 	var assert = assert.New(t)
 
-	rr := bytes.NewBufferString("{\"name\":\"go\"}")
+	rr := bytes.NewBufferString(`{"name":"go"}`)
 	buf, _ := ioutil.ReadAll(rr)
 	sj, _ := simplejson.NewJson(buf)
 
-	d, _ := getItem(sj, "name")
+	d, _ := getItem(sj, "")
 	result, _ := d.Encode()
-	assert.Equal(string(result), "\"go\"")
+	assert.Equal(`{"name":"go"}`, string(result))
+
+	d, _ = getItem(sj, "name")
+	result, _ = d.Encode()
+	assert.Equal(`"go"`, string(result))
 
 	// case 2
 	rr = bytes.NewBufferString(`{"name":"go","age":20}`)
@@ -126,7 +143,7 @@ func TestGetItem(t *testing.T) {
 
 	d, _ = getItem(sj, "age")
 	result, _ = d.Encode()
-	assert.Equal(string(result), "20")
+	assert.Equal("20", string(result))
 
 	// case 3
 	rr = bytes.NewBufferString(`{"data":{"name":"go","age":20}}`)
@@ -139,8 +156,8 @@ func TestGetItem(t *testing.T) {
 	result2, _ := d2.Encode()
 	result3, _ := d3.Encode()
 
-	assert.Equal(string(result2), `"go"`)
-	assert.Equal(string(result3), `20`)
+	assert.Equal(`"go"`, string(result2))
+	assert.Equal(`20`, string(result3))
 
 	// case 4
 	rr = bytes.NewBufferString(`{"data":[{"name":"test","age":30},{"name":"go","age":20}]}`)
@@ -152,7 +169,22 @@ func TestGetItem(t *testing.T) {
 	d3, _ = getItem(d2, "name")
 	result, _ = d3.Encode()
 
-	assert.Equal(string(result), `"go"`)
+	assert.Equal(`"go"`, string(result))
+
+	// case 5
+	rr = bytes.NewBufferString(`[{"name":"go","age":20}]`)
+	buf, _ = ioutil.ReadAll(rr)
+	sj, _ = simplejson.NewJson(buf)
+
+	d, _ = getItem(sj, "")
+	result, _ = d.Encode()
+	assert.Equal(`[{"age":20,"name":"go"}]`, string(result))
+
+	// case 6
+	d, _ = getItem(sj, "[0]")
+	result, _ = d.Encode()
+	assert.Equal(`{"age":20,"name":"go"}`, string(result))
+
 }
 
 func TestGetFilteredData(t *testing.T) {
@@ -251,6 +283,43 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Equal(`{"aaa":123,"aab":234}`, string(d))
 	assert.Equal([]string{``, ``}, s)
 	assert.Equal([]string{}, c)
+
+	// case 3-1
+	data = `{"aa":"abcde","bb":{"foo":"bar"}}`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	q = NewQueryWithString(".bb")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"foo":"bar"}`, string(d))
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
+
+	// case 4-1
+	data = `[{"name": "simeji"},{"name": "simeji2"}]`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	q = NewQueryWithString("")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`[{"name":"simeji"},{"name":"simeji2"}]`, string(d))
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
+
+	// case 5-1
+	data = `{"PrivateName":"simei", "PrivateAlias": "simeji2"}`
+	r = bytes.NewBufferString(data)
+	jm, _ = NewJsonManager(r)
+
+	q = NewQueryWithString(".Private")
+	result, s, c, err = jm.GetFilteredData(q, false)
+	d, _ = result.Encode()
+	assert.Equal([]string{``, `Private`}, s)
+	assert.Equal([]string{"PrivateAlias", "PrivateName"}, c)
 }
 
 func TestGetFilteredDataWithMatchQuery(t *testing.T) {
@@ -273,8 +342,16 @@ func TestGetFilteredDataWithMatchQuery(t *testing.T) {
 	assert.Nil(err)
 	d, _ = result.Encode()
 	assert.Equal(`{"account":"simeji"}`, string(d))
-	assert.Equal([]string{"account", "account"}, s)
+	assert.Equal([]string{"", ""}, s)
 	assert.Equal([]string{}, c)
+
+	q = NewQueryWithString(`.naming.`)
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`{"account":"simeji"}`, string(d))
+	assert.Equal([]string{"account", "account"}, s)
+	assert.Equal([]string{"account"}, c)
 
 	q = NewQueryWithString(`.test`)
 	result, s, c, err = jm.GetFilteredData(q, false)

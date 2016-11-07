@@ -188,6 +188,9 @@ func (q *Query) StringPopKeyword() (string, []rune) {
 
 func validate(r []rune) bool {
 	s := string(r)
+	if s == "" {
+		return true
+	}
 	if regexp.MustCompile(`^[^.]`).MatchString(s) {
 		return false
 	}
