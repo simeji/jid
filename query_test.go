@@ -77,7 +77,8 @@ func TestQuerySet(t *testing.T) {
 	v := []rune(".hello")
 	q := NewQuery(v)
 
-	assert.Equal(q.Set([]rune(".world")), []rune(".world"))
+	assert.Equal([]rune(".world"), q.Set([]rune(".world")))
+	assert.Equal("", string(q.Set([]rune(""))))
 }
 
 func TestQuerySetWithInvalidQuery(t *testing.T) {
@@ -258,6 +259,10 @@ func TestStringGetLastKeyword(t *testing.T) {
 	v = []rune(".test")
 	q = NewQuery(v)
 	assert.Equal(q.StringGetLastKeyword(), "test")
+
+	v = []rune("")
+	q = NewQuery(v)
+	assert.Equal(q.StringGetLastKeyword(), "")
 }
 
 func TestPopKeyword(t *testing.T) {
@@ -321,6 +326,12 @@ func TestStringGetKeywords(t *testing.T) {
 		"test",
 		"name",
 	})
+
+	v = []rune("")
+	q = NewQuery(v)
+	kws := q.StringGetKeywords()
+	assert.Equal([]string(nil), kws)
+	assert.Equal(0, len(kws))
 }
 
 func TestStringPopKeyword(t *testing.T) {
