@@ -1,7 +1,6 @@
 package jig
 
 import (
-	"fmt"
 	"github.com/nsf/termbox-go"
 	"io"
 	"strings"
@@ -12,14 +11,24 @@ const (
 	FilterPrompt string = "[Filter]> "
 )
 
+type EngineInterface interface {
+	Run() EngineResultInterface
+	GetQuery() QueryInterface
+}
+
+type EngineResultInterface interface {
+	GetQueryString() string
+	GetContent() string
+	GetError() error
+}
+
 type Engine struct {
 	manager       *JsonManager
-	jq            bool
-	pretty        bool
-	query         *Query
+	query         QueryInterface
 	term          *Terminal
 	complete      []string
 	keymode       bool
+	candidates    []string
 	candidatemode bool
 	candidateidx  int
 	contentOffset int
@@ -27,19 +36,18 @@ type Engine struct {
 	cursorOffsetX int
 }
 
-func NewEngine(s io.Reader, q bool, p bool) *Engine {
+func NewEngine(s io.Reader) EngineInterface {
 	j, err := NewJsonManager(s)
 	if err != nil {
 		return &Engine{}
 	}
 	e := &Engine{
 		manager:       j,
-		jq:            q,
-		pretty:        p,
 		term:          NewTerminal(FilterPrompt, DefaultY),
 		query:         NewQuery([]rune("")),
 		complete:      []string{"", ""},
 		keymode:       false,
+		candidates:    []string{},
 		candidatemode: false,
 		candidateidx:  0,
 		contentOffset: 0,
@@ -49,30 +57,28 @@ func NewEngine(s io.Reader, q bool, p bool) *Engine {
 	return e
 }
 
-func (e Engine) Run() int {
-
-	if !e.render() {
-		return 2
-	}
-	if e.jq {
-		fmt.Printf("%s", e.query.StringGet())
-	} else if e.pretty {
-		s, _, _, err := e.manager.GetPretty(e.query, true)
-		if err != nil {
-			return 1
-		}
-		fmt.Printf("%s", s)
-	} else {
-		s, _, _, err := e.manager.Get(e.query, true)
-		if err != nil {
-			return 1
-		}
-		fmt.Printf("%s", s)
-	}
-	return 0
+type EngineResult struct {
+	content string
+	qs      string
+	err     error
 }
 
-func (e *Engine) render() bool {
+func (er *EngineResult) GetQueryString() string {
+	return er.qs
+}
+
+func (er *EngineResult) GetContent() string {
+	return er.content
+}
+func (er *EngineResult) GetError() error {
+	return er.err
+}
+
+func (e *Engine) GetQuery() QueryInterface {
+	return e.query
+}
+
+func (e *Engine) Run() EngineResultInterface {
 
 	err := termbox.Init()
 	if err != nil {
@@ -81,29 +87,11 @@ func (e *Engine) render() bool {
 	defer termbox.Close()
 
 	var contents []string
-	var candidates []string
-	var c string
 
 	for {
-		c, e.complete, candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+		contents = e.getContents()
+		e.setCandidateData()
 		e.queryConfirm = false
-		if e.keymode {
-			contents = candidates
-		} else {
-			contents = strings.Split(c, "\n")
-		}
-		if l := len(candidates); e.complete[0] == "" && l > 1 {
-			//e.candidatemode = true
-			if e.candidateidx >= l {
-				e.candidateidx = 0
-			}
-		} else {
-			e.candidatemode = false
-		}
-		if !e.candidatemode {
-			e.candidateidx = 0
-			candidates = []string{}
-		}
 
 		ta := &TerminalDrawAttributes{
 			Query:           e.query.StringGet(),
@@ -112,7 +100,7 @@ func (e *Engine) render() bool {
 			CandidateIndex:  e.candidateidx,
 			ContentsOffsetY: e.contentOffset,
 			Complete:        e.complete[0],
-			Candidates:      candidates,
+			Candidates:      e.candidates,
 		}
 
 		e.term.draw(ta)
@@ -121,7 +109,7 @@ func (e *Engine) render() bool {
 		case termbox.EventKey:
 			switch ev.Key {
 			case 0:
-				e.inputAction(ev.Ch)
+				e.inputChar(ev.Ch)
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				e.deleteChar()
 			case termbox.KeyTab:
@@ -135,29 +123,26 @@ func (e *Engine) render() bool {
 			case termbox.KeyEnd, termbox.KeyCtrlE:
 				e.moveCursorToEnd()
 			case termbox.KeyCtrlK:
-				e.ctrlkAction()
+				e.scrollToAbove()
 			case termbox.KeyCtrlJ:
-				e.ctrljAction()
+				e.scrollToBelow()
 			case termbox.KeyCtrlL:
-				e.ctrllAction()
-			case termbox.KeySpace:
-				e.spaceAction()
+				e.toggleKeymode()
 			case termbox.KeyCtrlW:
-				e.ctrlwAction()
+				e.deleteWordBackward()
 			case termbox.KeyEsc:
-				e.escAction()
+				e.escapeCandidateMode()
 			case termbox.KeyEnter:
 				if !e.candidatemode {
-					return true
+					cc, _, _, err := e.manager.Get(e.query, true)
+					return &EngineResult{
+						content: cc,
+						err:     err,
+					}
 				}
-				_, _ = e.query.PopKeyword()
-				_ = e.query.StringAdd(".")
-				q := e.query.StringAdd(candidates[e.candidateidx])
-				e.cursorOffsetX = len(q)
-				e.queryConfirm = true
-
+				e.confirmCandidate()
 			case termbox.KeyCtrlC:
-				return false
+				return &EngineResult{}
 			default:
 			}
 		case termbox.EventError:
@@ -168,27 +153,58 @@ func (e *Engine) render() bool {
 	}
 }
 
-func (e *Engine) spaceAction() {
-	_ = e.query.StringAdd(" ")
+func (e *Engine) getContents() []string {
+	var c string
+	var contents []string
+	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+	if e.keymode {
+		contents = e.candidates
+	} else {
+		contents = strings.Split(c, "\n")
+	}
+	return contents
 }
+
+func (e *Engine) setCandidateData() {
+	if l := len(e.candidates); e.complete[0] == "" && l > 1 {
+		if e.candidateidx >= l {
+			e.candidateidx = 0
+		}
+	} else {
+		e.candidatemode = false
+	}
+	if !e.candidatemode {
+		e.candidateidx = 0
+		e.candidates = []string{}
+	}
+}
+
+func (e *Engine) confirmCandidate() {
+	_, _ = e.query.PopKeyword()
+	_ = e.query.StringAdd(".")
+	q := e.query.StringAdd(e.candidates[e.candidateidx])
+	e.cursorOffsetX = len(q)
+	e.queryConfirm = true
+}
+
 func (e *Engine) deleteChar() {
 	if e.cursorOffsetX > 0 {
 		_ = e.query.Delete(e.cursorOffsetX - 1)
 		e.cursorOffsetX -= 1
 	}
 }
-func (e *Engine) ctrljAction() {
+func (e *Engine) scrollToBelow() {
 	e.contentOffset++
 }
-func (e *Engine) ctrlkAction() {
+func (e *Engine) scrollToAbove() {
 	if o := e.contentOffset - 1; o >= 0 {
 		e.contentOffset = o
 	}
 }
-func (e *Engine) ctrllAction() {
+func (e *Engine) toggleKeymode() {
 	e.keymode = !e.keymode
 }
-func (e *Engine) ctrlwAction() {
+func (e *Engine) deleteWordBackward() {
 	if k, _ := e.query.StringPopKeyword(); k != "" && !strings.Contains(k, "[") {
 		_ = e.query.StringAdd(".")
 	}
@@ -197,24 +213,25 @@ func (e *Engine) ctrlwAction() {
 func (e *Engine) tabAction() {
 	if !e.candidatemode {
 		e.candidatemode = true
-		if e.complete[0] != e.complete[1] && e.complete[0] != "" {
+		if e.query.StringGet() == "" {
+			_ = e.query.StringAdd(".")
+		} else if e.complete[0] != e.complete[1] && e.complete[0] != "" {
 			if k, _ := e.query.StringPopKeyword(); !strings.Contains(k, "[") {
 				_ = e.query.StringAdd(".")
 			}
+			_ = e.query.StringAdd(e.complete[1])
+		} else {
+			_ = e.query.StringAdd(e.complete[0])
 		}
-		if e.query.StringGet() == "" {
-			_ = e.query.StringAdd(".")
-		}
-		_ = e.query.StringAdd(e.complete[1])
 	} else {
 		e.candidateidx = e.candidateidx + 1
 	}
 	e.cursorOffsetX = len(e.query.Get())
 }
-func (e *Engine) escAction() {
+func (e *Engine) escapeCandidateMode() {
 	e.candidatemode = false
 }
-func (e *Engine) inputAction(ch rune) {
+func (e *Engine) inputChar(ch rune) {
 	b := len(e.query.Get())
 	q := e.query.StringInsert(string(ch), e.cursorOffsetX)
 	if b < len(q) {
