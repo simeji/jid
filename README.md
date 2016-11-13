@@ -81,6 +81,4 @@ curl -s http://rdg.afilias.info/rdap/domain/example.info | jig
 
 ### Option
 
--p : Pretty print (output json)
-
 -q : Print query (for jq)
