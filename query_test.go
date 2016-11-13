@@ -1,4 +1,4 @@
-package jig
+package jid
 
 import (
 	"github.com/stretchr/testify/assert"

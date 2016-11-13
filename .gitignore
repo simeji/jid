@@ -26,5 +26,6 @@ _testmain.go
 *.test
 test.*
 
-# jig package
-jig
+# jid package
+jid
+*.out
