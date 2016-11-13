@@ -1,7 +1,7 @@
 # jid
 Json Incremental Digger
 
-It's very simple tool.
+It's very simple tool.  
 You can drill down interactively by using filtering queries like [jq](https://stedolan.github.io/jq/).
 
 ## Demo
@@ -19,12 +19,12 @@ https://github.com/simeji/jid/releases
 ### Build "jid" command by yourself
 
 jid require some packages.
-Please go get below packages.
+Please `go get` below packages.
 
-[bitly/go-simplejson](https://github.com/bitly/go-simplejson)
-[nsf/termbox-go](https://github.com/nsf/termbox-go)
-[pkg/erros](https://github.com/pkg/errors)
-[stretchr/testify/assert](https://github.com/stretchr/testify/assert)
+[bitly/go-simplejson](https://github.com/bitly/go-simplejson)  
+[nsf/termbox-go](https://github.com/nsf/termbox-go)  
+[pkg/erros](https://github.com/pkg/errors)  
+[stretchr/testify/assert](https://github.com/stretchr/testify/assert)  
 
 ## Usage
 
