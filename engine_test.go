@@ -257,3 +257,47 @@ func TestInputChar(t *testing.T) {
 	assert.Equal(".namen.", e.query.StringGet())
 	assert.Equal(7, e.cursorOffsetX)
 }
+
+func TestMoveCursorForwardAndBackward(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`{"name":"simeji"}`)
+	e.query.StringSet(".ne")
+
+	e.cursorOffsetX = 0
+	e.moveCursorForward()
+	assert.Equal(1, e.cursorOffsetX)
+	e.moveCursorForward()
+	assert.Equal(2, e.cursorOffsetX)
+	e.moveCursorForward()
+	assert.Equal(3, e.cursorOffsetX)
+	e.moveCursorForward()
+	assert.Equal(3, e.cursorOffsetX)
+
+	e.moveCursorBackward()
+	assert.Equal(2, e.cursorOffsetX)
+	e.moveCursorBackward()
+	assert.Equal(1, e.cursorOffsetX)
+	e.moveCursorBackward()
+	assert.Equal(0, e.cursorOffsetX)
+	e.moveCursorBackward()
+	assert.Equal(0, e.cursorOffsetX)
+}
+
+func TestMoveCursorToTopAndEnd(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`{"name":"simeji"}`)
+	e.query.StringSet(".ne")
+
+	e.cursorOffsetX = 2
+	e.moveCursorToTop()
+	assert.Zero(e.cursorOffsetX)
+
+	e.moveCursorToEnd()
+	assert.Equal(3, e.cursorOffsetX)
+}
+
+func getEngine(j string) *Engine {
+	r := bytes.NewBufferString(j)
+	e := NewEngine(r).(*Engine)
+	return e
+}
