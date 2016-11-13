@@ -137,6 +137,7 @@ func (e *Engine) Run() EngineResultInterface {
 					cc, _, _, err := e.manager.Get(e.query, true)
 					return &EngineResult{
 						content: cc,
+						qs:      e.query.StringGet(),
 						err:     err,
 					}
 				}

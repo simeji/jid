@@ -11,17 +11,15 @@ func main() {
 	content := os.Stdin
 
 	var query bool
-	var pretty bool
 
 	flag.BoolVar(&query, "q", false, "output query")
-	flag.BoolVar(&pretty, "p", false, "pretty print")
 	flag.Parse()
 
 	e := jig.NewEngine(content)
-	os.Exit(run(e, query, pretty))
+	os.Exit(run(e, query))
 }
 
-func run(e jig.EngineInterface, query bool, pretty bool) int {
+func run(e jig.EngineInterface, query bool) int {
 
 	result := e.Run()
 	if result.GetError() != nil {
@@ -29,15 +27,8 @@ func run(e jig.EngineInterface, query bool, pretty bool) int {
 	}
 	if query {
 		fmt.Printf("%s", result.GetQueryString())
-	} else if pretty {
-		//s, _, _, err := e.manager.GetPretty(e.query, true)
-		//if err != nil {
-		//return 1
-		//}
-		//fmt.Printf("%s", s)
 	} else {
-		s := result.GetContent()
-		fmt.Printf("%s", s)
+		fmt.Printf("%s", result.GetContent())
 	}
 	return 0
 }
