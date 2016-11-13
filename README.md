@@ -1,7 +1,7 @@
 # jid
-json interactive digger
+Json Incremental Digger
 
-It's very simple and pawerful tool.
+It's very simple tool.
 You can drill down interactively by using filtering queries like [jq](https://stedolan.github.io/jq/).
 
 ## Demo
