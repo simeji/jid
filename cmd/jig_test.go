@@ -20,14 +20,14 @@ func TestJigRun(t *testing.T) {
 	var assert = assert.New(t)
 
 	e := &EngineMock{err: nil}
-	result := run(e, false, false)
+	result := run(e, false)
 	assert.Zero(result)
 	assert.Equal(2, called)
 
-	result = run(e, true, false)
+	result = run(e, true)
 	assert.Equal(1, called)
 
-	result = run(e, false, true)
+	result = run(e, false)
 	assert.Zero(result)
 }
 
@@ -35,7 +35,7 @@ func TestJigRunWithError(t *testing.T) {
 	called = 0
 	var assert = assert.New(t)
 	e := &EngineMock{err: fmt.Errorf("")}
-	result := run(e, false, false)
+	result := run(e, false)
 	assert.Equal(2, result)
 	assert.Equal(0, called)
 }
