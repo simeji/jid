@@ -10,6 +10,17 @@ You can drill down interactively by using filtering queries like [jq](https://st
 
 ## Installation
 
+* [With homebrew taps (for Mac)](#with-homebrew-taps-for-mac)  
+* [Simply use "jid" command](#simply-use-jid-command)  
+* [Build "jid" command by yourself](#build-jid-command-by-yourself)  
+
+### With homebrew taps (for Mac)
+
+```
+brew tap simeji/jid
+brew install jid
+```
+
 ### Simply use "jid" command
 
 If you simply want to use `jid` command, please download binary from below.
@@ -29,6 +40,10 @@ Please `go get` below packages.
 ## Usage
 
 ### Quick start
+
+* [simple json example](#simple-json-example)  
+* [simple json example2](#simple-json-example2)  
+* [with curl](#with-curl)  
 
 #### simple json example
 
