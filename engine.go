@@ -1,9 +1,10 @@
 package jid
 
 import (
-	"github.com/nsf/termbox-go"
 	"io"
 	"strings"
+
+	"github.com/nsf/termbox-go"
 )
 
 const (
