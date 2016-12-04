@@ -12,7 +12,7 @@ You can drill down interactively by using filtering queries like [jq](https://st
 
 * [With homebrew taps (for Mac)](#with-homebrew-taps-for-mac)  
 * [Simply use "jid" command](#simply-use-jid-command)  
-* [Build "jid" command by yourself](#build-jid-command-by-yourself)  
+* [Build](#build)  
 
 ### With homebrew taps (for Mac)
 
