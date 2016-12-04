@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/simeji/jid"
 	"os"
+
+	"github.com/simeji/jid"
 )
 
 func main() {
@@ -15,7 +16,12 @@ func main() {
 	flag.BoolVar(&query, "q", false, "output query")
 	flag.Parse()
 
-	e := jid.NewEngine(content)
+	e, err := jid.NewEngine(content)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	os.Exit(run(e, query))
 }
 
