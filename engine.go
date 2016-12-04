@@ -37,10 +37,10 @@ type Engine struct {
 	cursorOffsetX int
 }
 
-func NewEngine(s io.Reader) EngineInterface {
+func NewEngine(s io.Reader) (EngineInterface, error) {
 	j, err := NewJsonManager(s)
 	if err != nil {
-		return &Engine{}
+		return nil, err
 	}
 	e := &Engine{
 		manager:       j,
@@ -55,7 +55,7 @@ func NewEngine(s io.Reader) EngineInterface {
 		queryConfirm:  false,
 		cursorOffsetX: 0,
 	}
-	return e
+	return e, nil
 }
 
 type EngineResult struct {
