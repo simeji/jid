@@ -4,6 +4,8 @@ Json Incremental Digger
 It's very simple tool.  
 You can drill down interactively by using filtering queries like [jq](https://stedolan.github.io/jq/).
 
+**Suggestion** and **Auto completion** of this tool will provide you very comfotable JSON drill down.
+
 ## Demo
 
 ![demo-jid-main](https://github.com/simeji/jid/wiki/images/demo-jid-main-640.gif)
@@ -44,6 +46,7 @@ go get github.com/stretchr/testify/assert
 
 * [simple json example](#simple-json-example)  
 * [simple json example2](#simple-json-example2)  
+* [with initial query](#with-initial-query)  
 * [with curl](#with-curl)  
 
 #### simple json example
@@ -77,6 +80,13 @@ This json is used by [demo section](https://github.com/simeji/jid#demo).
 echo '{"info":{"date":"2016-10-23","version":1.0},"users":[{"name":"simeji","uri":"https://github.com/simeji","id":1},{"name":"simeji2","uri":"https://example.com/simeji","id":2},{"name":"simeji3","uri":"https://example.com/simeji3","id":3}],"userCount":3}}'|jid
 ```
 
+#### With initial query
+
+First argument of `jid` is initial query.
+(Use JSON same as [Demo](#demo))
+
+![demo-jid-with-query](https://github.com/simeji/jid/wiki/images/demo-jid-with-query-640.gif)
+
 #### with curl
 
 Sample for using [RDAP](https://datatracker.ietf.org/wg/weirds/documents/) data.
@@ -100,5 +110,7 @@ curl -s http://rdg.afilias.info/rdap/domain/example.info | jid
 |`CTRL` + `L`|Change view mode whole json or keys (only object)|
 
 ### Option
+
+First argument: Initial query
 
 -q : Print query (for jq)

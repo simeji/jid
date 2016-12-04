@@ -12,17 +12,34 @@ func TestNewEngine(t *testing.T) {
 	var assert = assert.New(t)
 
 	f, _ := os.Create("/dev/null")
-	e, err := NewEngine(f)
+	e, err := NewEngine(f, "")
 	assert.Nil(e)
 	assert.NotNil(err)
 
-	ee := getEngine(`{"name":"go"}`)
+	ee := getEngine(`{"name":"go"}`, "")
 	assert.NotNil(ee)
+	assert.Equal("", ee.query.StringGet())
+	assert.Equal(0, ee.cursorOffsetX)
+}
+
+func TestNewEngineWithQuery(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`{"name":"go"}`, ".nam")
+	assert.Equal(".nam", e.query.StringGet())
+	assert.Equal(4, e.cursorOffsetX)
+
+	e = getEngine(`{"name":"go"}`, "nam")
+	assert.Equal("", e.query.StringGet())
+	assert.Equal(0, e.cursorOffsetX)
+
+	e = getEngine(`{"name":"go"}`, ".nam..")
+	assert.Equal("", e.query.StringGet())
+	assert.Equal(0, e.cursorOffsetX)
 }
 
 func TestDeleteChar(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go"}`)
+	e := getEngine(`{"name":"go"}`, "")
 	e.query.StringSet(".name")
 	e.cursorOffsetX = 5
 
@@ -33,7 +50,7 @@ func TestDeleteChar(t *testing.T) {
 
 func TestDeleteWordBackward(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go"}`)
+	e := getEngine(`{"name":"go"}`, "")
 	e.query.StringSet(".name")
 
 	e.deleteWordBackward()
@@ -53,7 +70,7 @@ func TestDeleteWordBackward(t *testing.T) {
 
 func TestScrollToAbove(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`)
+	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`, "")
 	assert.Equal(0, e.contentOffset)
 	e.scrollToAbove()
 	assert.Equal(0, e.contentOffset)
@@ -66,7 +83,7 @@ func TestScrollToAbove(t *testing.T) {
 
 func TestScrollToBelow(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`)
+	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`, "")
 	e.scrollToBelow()
 	assert.Equal(1, e.contentOffset)
 	e.scrollToBelow()
@@ -77,13 +94,13 @@ func TestScrollToBelow(t *testing.T) {
 func TestGetContents(t *testing.T) {
 	var assert = assert.New(t)
 
-	e := getEngine(`{"name":"go"}`)
+	e := getEngine(`{"name":"go"}`, "")
 	c := e.getContents()
 	assert.Equal([]string{`{`, `  "name": "go"`, "}"}, c)
 	assert.Equal([]string{}, e.candidates)
 	assert.Equal([]string{"", ""}, e.complete)
 
-	e = getEngine(`{"name":"go", "naming":"simeji", "foo":"bar"}`)
+	e = getEngine(`{"name":"go", "naming":"simeji", "foo":"bar"}`, "")
 	e.query.StringSet(".n")
 	c = e.getContents()
 	assert.Equal([]string{`{`, `  "foo": "bar",`, `  "name": "go",`, `  "naming": "simeji"`, "}"}, c)
@@ -99,7 +116,7 @@ func TestGetContents(t *testing.T) {
 
 func TestSetCandidateData(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go"}`)
+	e := getEngine(`{"name":"go"}`, "")
 
 	// case 1
 	e.candidates = []string{"test", "testing"}
@@ -160,7 +177,7 @@ func TestSetCandidateData(t *testing.T) {
 
 func TestConfirmCandidate(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`)
+	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`, "")
 	e.query.StringSet(".")
 	e.queryConfirm = false
 	e.candidates = []string{"test", "testing", "foo"}
@@ -178,7 +195,7 @@ func TestConfirmCandidate(t *testing.T) {
 	assert.True(e.queryConfirm)
 	assert.Equal(4, e.cursorOffsetX)
 
-	e = getEngine(`{"name":"go"}`)
+	e = getEngine(`{"name":"go"}`, "")
 	e.query.StringSet(".name.hoge")
 	e.candidates = []string{"aaa", "bbb", "ccc"}
 	e.candidateidx = 1
@@ -191,7 +208,7 @@ func TestConfirmCandidate(t *testing.T) {
 
 func TestCtrllAction(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`)
+	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`, "")
 	assert.False(e.keymode)
 	e.toggleKeymode()
 	assert.True(e.keymode)
@@ -201,7 +218,7 @@ func TestCtrllAction(t *testing.T) {
 
 func TestTabAction(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`)
+	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`, "")
 	e.query.StringSet(".namet")
 	e.complete = []string{"est", "NameTest"}
 
@@ -222,7 +239,7 @@ func TestTabAction(t *testing.T) {
 
 func TestEscAction(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`)
+	e := getEngine(`{"name":"go","NameTest":[1,2,3]}`, "")
 	assert.False(e.candidatemode)
 	e.escapeCandidateMode()
 	assert.False(e.candidatemode)
@@ -233,7 +250,7 @@ func TestEscAction(t *testing.T) {
 
 func TestInputChar(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"go"}`)
+	e := getEngine(`{"name":"go"}`, "")
 	e.query.StringSet(".name")
 	e.cursorOffsetX = len(e.query.Get())
 	assert.Equal(5, e.cursorOffsetX)
@@ -249,7 +266,7 @@ func TestInputChar(t *testing.T) {
 
 func TestMoveCursorForwardAndBackward(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"simeji"}`)
+	e := getEngine(`{"name":"simeji"}`, "")
 	e.query.StringSet(".ne")
 
 	e.cursorOffsetX = 0
@@ -274,7 +291,7 @@ func TestMoveCursorForwardAndBackward(t *testing.T) {
 
 func TestMoveCursorToTopAndEnd(t *testing.T) {
 	var assert = assert.New(t)
-	e := getEngine(`{"name":"simeji"}`)
+	e := getEngine(`{"name":"simeji"}`, "")
 	e.query.StringSet(".ne")
 
 	e.cursorOffsetX = 2
@@ -285,9 +302,9 @@ func TestMoveCursorToTopAndEnd(t *testing.T) {
 	assert.Equal(3, e.cursorOffsetX)
 }
 
-func getEngine(j string) *Engine {
+func getEngine(j string, qs string) *Engine {
 	r := bytes.NewBufferString(j)
-	e, _ := NewEngine(r)
+	e, _ := NewEngine(r, qs)
 	ee := e.(*Engine)
 	return ee
 }

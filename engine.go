@@ -37,7 +37,7 @@ type Engine struct {
 	cursorOffsetX int
 }
 
-func NewEngine(s io.Reader) (EngineInterface, error) {
+func NewEngine(s io.Reader, qs string) (EngineInterface, error) {
 	j, err := NewJsonManager(s)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func NewEngine(s io.Reader) (EngineInterface, error) {
 	e := &Engine{
 		manager:       j,
 		term:          NewTerminal(FilterPrompt, DefaultY),
-		query:         NewQuery([]rune("")),
+		query:         NewQuery([]rune(qs)),
 		complete:      []string{"", ""},
 		keymode:       false,
 		candidates:    []string{},
@@ -55,6 +55,7 @@ func NewEngine(s io.Reader) (EngineInterface, error) {
 		queryConfirm:  false,
 		cursorOffsetX: 0,
 	}
+	e.cursorOffsetX = len(e.query.Get())
 	return e, nil
 }
 
