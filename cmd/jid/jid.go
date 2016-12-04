@@ -11,27 +11,33 @@ import (
 func main() {
 	content := os.Stdin
 
-	var query bool
+	var qm bool
+	qs := "."
 
-	flag.BoolVar(&query, "q", false, "output query")
+	flag.BoolVar(&qm, "q", false, "Output query mode")
 	flag.Parse()
 
-	e, err := jid.NewEngine(content)
+	args := flag.Args()
+	if len(args) > 0 {
+		qs = args[0]
+	}
+
+	e, err := jid.NewEngine(content, qs)
 
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	os.Exit(run(e, query))
+	os.Exit(run(e, qm))
 }
 
-func run(e jid.EngineInterface, query bool) int {
+func run(e jid.EngineInterface, qm bool) int {
 
 	result := e.Run()
 	if result.GetError() != nil {
 		return 2
 	}
-	if query {
+	if qm {
 		fmt.Printf("%s", result.GetQueryString())
 	} else {
 		fmt.Printf("%s", result.GetContent())

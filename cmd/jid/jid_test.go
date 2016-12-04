@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/simeji/jid"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/simeji/jid"
+	"github.com/stretchr/testify/assert"
 )
 
 var called int = 0
@@ -16,7 +17,7 @@ func TestMain(m *testing.M) {
 	defer os.Exit(code)
 }
 
-func TestjidRun(t *testing.T) {
+func TestJidRun(t *testing.T) {
 	var assert = assert.New(t)
 
 	e := &EngineMock{err: nil}
@@ -31,7 +32,7 @@ func TestjidRun(t *testing.T) {
 	assert.Zero(result)
 }
 
-func TestjidRunWithError(t *testing.T) {
+func TestJidRunWithError(t *testing.T) {
 	called = 0
 	var assert = assert.New(t)
 	e := &EngineMock{err: fmt.Errorf("")}
