@@ -27,15 +27,16 @@ If you simply want to use `jid` command, please download binary from below.
 
 https://github.com/simeji/jid/releases
 
-### Build "jid" command by yourself
+## Build
 
-jid require some packages.
-Please `go get` below packages.
+Building jid requires some packages.
 
-[bitly/go-simplejson](https://github.com/bitly/go-simplejson)  
-[nsf/termbox-go](https://github.com/nsf/termbox-go)  
-[pkg/erros](https://github.com/pkg/errors)  
-[stretchr/testify/assert](https://github.com/stretchr/testify/assert)  
+```
+go get github.com/bitly/go-simplejson
+go get github.com/nsf/termbox-go
+go get github.com/pkg/errors
+go get github.com/stretchr/testify/assert
+```
 
 ## Usage
 
