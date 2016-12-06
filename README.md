@@ -31,13 +31,8 @@ https://github.com/simeji/jid/releases
 
 ## Build
 
-Building jid requires some packages.
-
 ```
-go get github.com/bitly/go-simplejson
-go get github.com/nsf/termbox-go
-go get github.com/pkg/errors
-go get github.com/stretchr/testify/assert
+go get -u github.com/simeji/jid/cmd/jid
 ```
 
 ## Usage
