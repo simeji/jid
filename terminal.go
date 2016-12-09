@@ -32,7 +32,7 @@ func NewTerminal(prompt string, defaultY int) *Terminal {
 	}
 }
 
-func (t *Terminal) draw(attr *TerminalDrawAttributes) error {
+func (t *Terminal) draw(attr *TerminalDrawAttributes, keymode bool) error {
 
 	query := attr.Query
 	complete := attr.Complete
@@ -53,14 +53,22 @@ func (t *Terminal) draw(attr *TerminalDrawAttributes) error {
 		y = t.drawCandidates(0, t.defaultY, candidateidx, candidates)
 	}
 
-	cellsArr, err := t.rowsToCells(rows)
-	if err != nil {
-		return err
-	}
+	if keymode {
+		for idx, row := range rows {
+			if i := idx - contentOffsetY; i >= 0 {
+				t.drawln(0, i+y, row, nil)
+			}
+		}
+	} else {
+		cellsArr, err := t.rowsToCells(rows)
+		if err != nil {
+			return err
+		}
 
-	for idx, cells := range cellsArr {
-		if i := idx - contentOffsetY; i >= 0 {
-			t.drawCells(0, i+y, cells)
+		for idx, cells := range cellsArr {
+			if i := idx - contentOffsetY; i >= 0 {
+				t.drawCells(0, i+y, cells)
+			}
 		}
 	}
 	termbox.SetCursor(len(t.prompt)+attr.CursorOffsetX, 0)

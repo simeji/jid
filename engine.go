@@ -105,7 +105,7 @@ func (e *Engine) Run() EngineResultInterface {
 			Candidates:      e.candidates,
 		}
 
-		err = e.term.draw(ta)
+		err = e.term.draw(ta, e.keymode)
 		if err != nil {
 			panic(err)
 		}
