@@ -1,6 +1,7 @@
 package jid
 
 import (
+	"github.com/mattn/go-runewidth"
 	"github.com/nsf/termbox-go"
 	"github.com/nwidger/jsoncolor"
 
@@ -166,8 +167,16 @@ func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 }
 
 func (t *Terminal) drawCells(x int, y int, cells []termbox.Cell) {
-	for i, c := range cells {
+	i := 0
+	for _, c := range cells {
 		termbox.SetCell(x+i, y, c.Ch, c.Fg, c.Bg)
+
+		w := runewidth.RuneWidth(c.Ch)
+		if w == 0 || w == 2 && runewidth.IsAmbiguousWidth(c.Ch) {
+			w = 1
+		}
+
+		i += w
 	}
 }
 
