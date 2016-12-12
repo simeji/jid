@@ -12,14 +12,13 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ## Installation
 
-* [With homebrew taps (for Mac)](#with-homebrew-taps-for-mac)  
+* [With homebrew (for Mac)](#with-homebrew-for-mac)  
 * [Simply use "jid" command](#simply-use-jid-command)  
 * [Build](#build)  
 
-### With homebrew taps (for Mac)
+### With homebrew (for Mac)
 
 ```
-brew tap simeji/jid
 brew install jid
 ```
 
@@ -75,7 +74,7 @@ This json is used by [demo section](https://github.com/simeji/jid#demo).
 echo '{"info":{"date":"2016-10-23","version":1.0},"users":[{"name":"simeji","uri":"https://github.com/simeji","id":1},{"name":"simeji2","uri":"https://example.com/simeji","id":2},{"name":"simeji3","uri":"https://example.com/simeji3","id":3}],"userCount":3}}'|jid
 ```
 
-#### With initial query
+#### With a initial query
 
 First argument of `jid` is initial query.
 (Use JSON same as [Demo](#demo))
@@ -90,14 +89,20 @@ Sample for using [RDAP](https://datatracker.ietf.org/wg/weirds/documents/) data.
 curl -s http://rdg.afilias.info/rdap/domain/example.info | jid
 ```
 
+#### Load JSON from a file
+
+```
+jid < file.json
+```
+
 ## Keymaps
 
 |key|description|
 |:-----------|:----------|
 |`TAB` / `CTRL` + `I` |Show available items and choice them|
 |`CTRL` + `W` |Delete from the cursor to the start of the word|
-|`CTRL` + `F` / Right Arrow (:arrow_right:)|To the first character of the 'Filter'|
-|`CTRL` + `B` / Left Arrow (:arrow_left:)|To the end of the 'Filter'|
+|`CTRL` + `F` / Right Arrow (:arrow_right:)|Move cursor a character to the right|
+|`CTRL` + `B` / Left Arrow (:arrow_left:)|Move cursor a character to the left|
 |`CTRL` + `A`|To the first character of the 'Filter'|
 |`CTRL` + `E`|To the end of the 'Filter'|
 |`CTRL` + `J`|Scroll json buffer 1 line downwards|
