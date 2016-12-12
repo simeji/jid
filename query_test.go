@@ -227,6 +227,14 @@ func TestGetKeywords(t *testing.T) {
 		[]rune("[0]"),
 	})
 
+	v = []rune(`."".hello."\""`)
+	q = NewQuery(v)
+	assert.Equal([][]rune{
+		[]rune(`""`),
+		[]rune("hello"),
+		[]rune(`"\""`),
+	}, q.GetKeywords())
+
 }
 
 func TestGetLastKeyword(t *testing.T) {

@@ -124,9 +124,7 @@ func TestGetPretty(t *testing.T) {
 func TestGetItem(t *testing.T) {
 	var assert = assert.New(t)
 
-	rr := bytes.NewBufferString(`{"name":"go"}`)
-	buf, _ := ioutil.ReadAll(rr)
-	sj, _ := simplejson.NewJson(buf)
+	sj := getSimplejson(`{"name":"go"}`)
 
 	d, _ := getItem(sj, "")
 	result, _ := d.Encode()
@@ -137,18 +135,14 @@ func TestGetItem(t *testing.T) {
 	assert.Equal(`"go"`, string(result))
 
 	// case 2
-	rr = bytes.NewBufferString(`{"name":"go","age":20}`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = getSimplejson(`{"name":"go","age":20}`)
 
 	d, _ = getItem(sj, "age")
 	result, _ = d.Encode()
 	assert.Equal("20", string(result))
 
 	// case 3
-	rr = bytes.NewBufferString(`{"data":{"name":"go","age":20}}`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = getSimplejson(`{"data":{"name":"go","age":20}}`)
 
 	d, _ = getItem(sj, "data")
 	d2, _ := getItem(d, "name")
@@ -160,9 +154,7 @@ func TestGetItem(t *testing.T) {
 	assert.Equal(`20`, string(result3))
 
 	// case 4
-	rr = bytes.NewBufferString(`{"data":[{"name":"test","age":30},{"name":"go","age":20}]}`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = getSimplejson(`{"data":[{"name":"test","age":30},{"name":"go","age":20}]}`)
 
 	d, _ = getItem(sj, "data")
 	d2, _ = getItem(d, "[1]")
@@ -172,9 +164,7 @@ func TestGetItem(t *testing.T) {
 	assert.Equal(`"go"`, string(result))
 
 	// case 5
-	rr = bytes.NewBufferString(`[{"name":"go","age":20}]`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = getSimplejson(`[{"name":"go","age":20}]`)
 
 	d, _ = getItem(sj, "")
 	result, _ = d.Encode()
@@ -185,6 +175,20 @@ func TestGetItem(t *testing.T) {
 	result, _ = d.Encode()
 	assert.Equal(`{"age":20,"name":"go"}`, string(result))
 
+	// case 7
+	sj = getSimplejson(`{"":"go","\"":20, "test space":"ok"}`)
+
+	d, _ = getItem(sj, `""`)
+	result, _ = d.Encode()
+	assert.Equal(`"go"`, string(result))
+
+	d, _ = getItem(sj, `"`)
+	result, _ = d.Encode()
+	assert.Equal(`20`, string(result))
+
+	d, _ = getItem(sj, `test space`)
+	result, _ = d.Encode()
+	assert.Equal(`"ok"`, string(result))
 }
 
 func TestGetFilteredData(t *testing.T) {
@@ -416,4 +420,11 @@ func TestIsEmptyJson(t *testing.T) {
 
 	assert.Equal(false, isEmptyJson(sj))
 	assert.Equal(true, isEmptyJson(&simplejson.Json{}))
+}
+
+func getSimplejson(s string) *simplejson.Json {
+	r := bytes.NewBufferString(s)
+	buf, _ := ioutil.ReadAll(r)
+	sj, _ := simplejson.NewJson(buf)
+	return sj
 }

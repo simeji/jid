@@ -1,13 +1,13 @@
 package jid
 
 import (
-	"github.com/bitly/go-simplejson"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"regexp"
 	"strconv"
-	//"strings"
+
+	"github.com/bitly/go-simplejson"
+	"github.com/pkg/errors"
 )
 
 type JsonManager struct {
@@ -111,6 +111,9 @@ func getItem(json *simplejson.Json, s string) (*simplejson.Json, bool) {
 	if s == "" {
 		return json, false
 	}
+
+	re = regexp.MustCompile(`^"(.*)"$`)
+	s = re.ReplaceAllString(s, "$1")
 
 	// Query include [
 	if len(matches) > 0 {
