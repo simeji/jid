@@ -14,12 +14,20 @@ func main() {
 	content := os.Stdin
 
 	var qm bool
+	var help bool
 	var version bool
 	qs := "."
 
 	flag.BoolVar(&qm, "q", false, "Output query mode")
+	flag.BoolVar(&help, "h", false, "print a help")
+	flag.BoolVar(&help, "help", false, "print a help")
 	flag.BoolVar(&version, "version", false, "print the version and exit")
 	flag.Parse()
+
+	if help {
+		fmt.Println(getHelpString())
+		os.Exit(0)
+	}
 
 	if version {
 		fmt.Println(fmt.Sprintf("jid version v%s", VERSION))
@@ -51,4 +59,43 @@ func run(e jid.EngineInterface, qm bool) int {
 		fmt.Printf("%s", result.GetContent())
 	}
 	return 0
+}
+
+func getHelpString() string {
+	return `
+
+============ Load JSON from a file ==============
+
+$ jid < file.json
+
+============ With a JSON filter mode =============
+
+TAB / CTRL-I
+  Show available items and choice them
+
+CTRL-W 
+  Delete from the cursor to the start of the word
+
+CTRL-F / Right Arrow
+  Move cursor a character to the right
+
+CTRL-B / Left Arrow
+  Move cursor a character to the left
+
+CTRL-A
+  To the first character of the 'Filter'
+
+CTRL-E
+  To the end of the 'Filter'
+
+CTRL-J
+  Scroll json buffer 1 line downwards
+
+CTRL-K
+  Scroll json buffer 1 line upwards
+
+CTRL-L
+  Change view mode whole json or keys (only object)
+
+`
 }
