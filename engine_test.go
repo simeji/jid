@@ -68,6 +68,16 @@ func TestDeleteWordBackward(t *testing.T) {
 	assert.Equal(5, e.cursorOffsetX)
 }
 
+func TestDeleteLineQuery(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`{"name":"go"}`, "")
+
+	e.query.StringSet(".name")
+	e.deleteLineQuery()
+	assert.Equal("", e.query.StringGet())
+	assert.Equal(0, e.cursorOffsetX)
+}
+
 func TestScrollToAbove(t *testing.T) {
 	var assert = assert.New(t)
 	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`, "")

@@ -91,6 +91,12 @@ func (e *Engine) Run() EngineResultInterface {
 	var contents []string
 
 	for {
+
+		if e.query.StringGet() == "" {
+			e.query.StringSet(".")
+			e.cursorOffsetX = len(e.query.StringGet())
+		}
+
 		contents = e.getContents()
 		e.setCandidateData()
 		e.queryConfirm = false
@@ -130,6 +136,8 @@ func (e *Engine) Run() EngineResultInterface {
 				e.scrollToBelow()
 			case termbox.KeyCtrlL:
 				e.toggleKeymode()
+			case termbox.KeyCtrlU:
+				e.deleteLineQuery()
 			case termbox.KeyCtrlW:
 				e.deleteWordBackward()
 			case termbox.KeyEsc:
@@ -196,6 +204,12 @@ func (e *Engine) deleteChar() {
 		e.cursorOffsetX -= 1
 	}
 }
+
+func (e *Engine) deleteLineQuery() {
+	_ = e.query.StringSet("")
+	e.cursorOffsetX = 0
+}
+
 func (e *Engine) scrollToBelow() {
 	e.contentOffset++
 }

@@ -101,6 +101,7 @@ jid < file.json
 |:-----------|:----------|
 |`TAB` / `CTRL` + `I` |Show available items and choice them|
 |`CTRL` + `W` |Delete from the cursor to the start of the word|
+|`CTRL` + `U` |Delete whole query|
 |`CTRL` + `F` / Right Arrow (:arrow_right:)|Move cursor a character to the right|
 |`CTRL` + `B` / Left Arrow (:arrow_left:)|Move cursor a character to the left|
 |`CTRL` + `A`|To the first character of the 'Filter'|
