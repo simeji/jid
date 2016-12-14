@@ -73,8 +73,11 @@ $ jid < file.json
 TAB / CTRL-I
   Show available items and choice them
 
-CTRL-W 
+CTRL-W
   Delete from the cursor to the start of the word
+
+CTRL-U
+  Delete whole query
 
 CTRL-F / Right Arrow
   Move cursor a character to the right
