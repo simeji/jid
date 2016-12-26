@@ -111,7 +111,10 @@ func (e *Engine) Run() EngineResultInterface {
 			Candidates:      e.candidates,
 		}
 
-		e.term.draw(ta)
+		err = e.term.draw(ta, e.keymode)
+		if err != nil {
+			panic(err)
+		}
 
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
