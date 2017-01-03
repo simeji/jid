@@ -71,6 +71,62 @@ func TestQueryGet(t *testing.T) {
 	assert.Equal(q.Get(), []rune(".test"))
 }
 
+func TestQueryLength(t *testing.T) {
+	var assert = assert.New(t)
+
+	v := []rune(".test")
+	q := NewQuery(v)
+
+	assert.Equal(5, q.Length())
+
+	v = []rune(".string.日本語.japan")
+	q = NewQuery(v)
+
+	assert.Equal(17, q.Length())
+}
+
+func TestQueryIndexOffsetN(t *testing.T) {
+	var assert = assert.New(t)
+
+	v := []rune(".test")
+	q := NewQuery(v)
+
+	assert.Equal(4, q.IndexOffset(4))
+	assert.Equal(0, q.IndexOffset(0))
+	assert.Equal(0, q.IndexOffset(-1))
+	assert.Equal(5, q.IndexOffset(6))
+
+	//off-------012345679-101213|j_15,n_19
+	v = []rune(".string.日本語.japan")
+	//idx-------012345678-9-10|j_12,n_16
+	q = NewQuery(v)
+
+	assert.Equal(19, q.IndexOffset(16))
+	assert.Equal(10, q.IndexOffset(9))
+}
+
+func TestQueryGetChar(t *testing.T) {
+	var assert = assert.New(t)
+
+	v := []rune(".test")
+	q := NewQuery(v)
+
+	assert.Equal('e', q.GetChar(2))
+	assert.Equal('t', q.GetChar(4))
+	assert.Equal('.', q.GetChar(0))
+	assert.Equal('.', q.GetChar(0))
+	assert.Equal(rune(0), q.GetChar(-1))
+	assert.Equal(rune(0), q.GetChar(6))
+
+	v = []rune(".string.日本語.japan")
+	q = NewQuery(v)
+
+	assert.Equal('n', q.GetChar(5))
+	assert.Equal('本', q.GetChar(9))
+	assert.Equal('.', q.GetChar(11))
+	assert.Equal(rune(0), q.GetChar(17))
+}
+
 func TestQuerySet(t *testing.T) {
 	var assert = assert.New(t)
 
@@ -108,7 +164,8 @@ func TestQueryInsert(t *testing.T) {
 	assert.Equal([]rune(".wwhello.world"), q.Insert([]rune("w"), 1))
 	assert.Equal([]rune(".wwhello.world"), q.Insert([]rune("."), 1))
 	assert.Equal([]rune(".wwh.ello.world"), q.Insert([]rune("."), 4))
-	assert.Equal([]rune(".wwh.ello.world"), q.Insert([]rune("a"), 20))
+	assert.Equal([]rune(".wwh.ello.worldg"), q.Insert([]rune("g"), 15))
+	assert.Equal([]rune(".wwh.ello.worldg"), q.Insert([]rune("a"), 20))
 }
 func TestQueryStringInsert(t *testing.T) {
 	var assert = assert.New(t)
@@ -138,19 +195,30 @@ func TestQueryDelete(t *testing.T) {
 	v := []rune(".helloworld")
 	q := NewQuery(v)
 
-	assert.Equal([]rune(".helloworl"), q.Delete(-1))
-	assert.Equal([]rune(".hellowor"), q.Delete(-1))
-	assert.Equal([]rune(".hellow"), q.Delete(-2))
-	assert.Equal([]rune(""), q.Delete(-8))
+	assert.Equal([]rune("d"), q.Delete(-1))
+	assert.Equal([]rune(".helloworl"), q.Get())
+	assert.Equal([]rune("l"), q.Delete(-1))
+	assert.Equal([]rune(".hellowor"), q.Get())
+	assert.Equal([]rune("or"), q.Delete(-2))
+	assert.Equal([]rune(".hellow"), q.Get())
+	assert.Equal([]rune(".hellow"), q.Delete(-8))
+	assert.Equal([]rune(""), q.Get())
 
 	q = NewQuery([]rune(".hello.world"))
-	assert.Equal([]rune(".hello.world"), q.Delete(0))
-	assert.Equal([]rune(".ello.world"), q.Delete(1))
-	assert.Equal([]rune(".llo.world"), q.Delete(1))
-	assert.Equal([]rune(".llo.world"), q.Delete(0))
-	assert.Equal([]rune(".ll.world"), q.Delete(3))
-	assert.Equal([]rune(".llworld"), q.Delete(3))
-	assert.Equal([]rune(".llorld"), q.Delete(3))
+	assert.Equal([]rune(""), q.Delete(0))
+	assert.Equal([]rune(".hello.world"), q.Get())
+	assert.Equal([]rune("h"), q.Delete(1))
+	assert.Equal([]rune(".ello.world"), q.Get())
+	assert.Equal([]rune("e"), q.Delete(1))
+	assert.Equal([]rune(".llo.world"), q.Get())
+	assert.Equal([]rune(""), q.Delete(0))
+	assert.Equal([]rune(".llo.world"), q.Get())
+	assert.Equal([]rune("o"), q.Delete(3))
+	assert.Equal([]rune(".ll.world"), q.Get())
+	assert.Equal([]rune("."), q.Delete(3))
+	assert.Equal([]rune(".llworld"), q.Get())
+	assert.Equal([]rune("w"), q.Delete(3))
+	assert.Equal([]rune(".llorld"), q.Get())
 }
 
 func TestGetKeywords(t *testing.T) {
