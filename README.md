@@ -8,7 +8,7 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ## Demo
 
-![demo-jid-main](https://github.com/simeji/jid/wiki/images/demo-jid-main-640.gif)
+![demo-jid-main](https://github.com/simeji/jid/wiki/images/demo-jid-main-640-colorize.gif)
 
 ## Installation
 
@@ -112,6 +112,11 @@ jid < file.json
 
 ### Option
 
-First argument: Initial query
-
--q : Print query (for jq)
+|option|description|
+|:-----------|:----------|
+|First argument ($1) | Initial query|
+|-h | print a help|
+|-help | print a help|
+|-version | print the version and exit|
+|-q | Output query mode (for jq)|
+|-M | monochrome output mode|

@@ -3,6 +3,8 @@ package jid
 import (
 	"regexp"
 	"strings"
+
+	"github.com/mattn/go-runewidth"
 )
 
 type QueryInterface interface {
@@ -12,6 +14,9 @@ type QueryInterface interface {
 	Add(query []rune) []rune
 	Delete(i int) []rune
 	Clear() []rune
+	Length() int
+	IndexOffset(int) int
+	GetChar(int) rune
 	GetKeywords() [][]rune
 	GetLastKeyword() []rune
 	PopKeyword() ([]rune, []rune)
@@ -45,6 +50,29 @@ func (q *Query) Get() []rune {
 	return *q.query
 }
 
+func (q *Query) GetChar(idx int) rune {
+	var r rune = 0
+	qq := q.Get()
+	if l := len(qq); l > idx && idx >= 0 {
+		r = qq[idx]
+	}
+	return r
+}
+
+func (q *Query) Length() int {
+	return len(q.Get())
+}
+
+func (q *Query) IndexOffset(i int) int {
+	o := 0
+	if l := q.Length(); i >= l {
+		o = runewidth.StringWidth(q.StringGet())
+	} else if i >= 0 && i < l {
+		o = runewidth.StringWidth(string(q.Get()[:i]))
+	}
+	return o
+}
+
 func (q *Query) Set(query []rune) []rune {
 	if validate(query) {
 		q.query = &query
@@ -73,20 +101,26 @@ func (q *Query) Add(query []rune) []rune {
 }
 
 func (q *Query) Delete(i int) []rune {
+	var d []rune
 	qq := q.Get()
 	lastIdx := len(qq)
 	if i < 0 {
 		if lastIdx+i >= 0 {
+			d = qq[lastIdx+i:]
 			qq = qq[0 : lastIdx+i]
 		} else {
+			d = qq
 			qq = qq[0:0]
 		}
 	} else if i == 0 {
+		d = []rune{}
 		qq = qq[1:]
 	} else if i > 0 && i < lastIdx {
+		d = []rune{qq[i]}
 		qq = append(qq[:i], qq[i+1:]...)
 	}
-	return q.Set(qq)
+	_ = q.Set(qq)
+	return d
 }
 
 func (q *Query) Clear() []rune {
