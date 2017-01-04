@@ -12,7 +12,10 @@ func TestNewEngine(t *testing.T) {
 	var assert = assert.New(t)
 
 	f, _ := os.Create("/dev/null")
-	e, err := NewEngine(f, "")
+	e, err := NewEngine(f, &EngineAttribute{
+		DefaultQuery: "",
+		Monochrome:   false,
+	})
 	assert.Nil(e)
 	assert.NotNil(err)
 
@@ -312,7 +315,10 @@ func TestMoveCursorToTopAndEnd(t *testing.T) {
 
 func getEngine(j string, qs string) *Engine {
 	r := bytes.NewBufferString(j)
-	e, _ := NewEngine(r, qs)
+	e, _ := NewEngine(r, &EngineAttribute{
+		DefaultQuery: qs,
+		Monochrome:   false,
+	})
 	ee := e.(*Engine)
 	return ee
 }

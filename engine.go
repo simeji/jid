@@ -37,15 +37,20 @@ type Engine struct {
 	queryConfirm   bool
 }
 
-func NewEngine(s io.Reader, qs string) (EngineInterface, error) {
+type EngineAttribute struct {
+	DefaultQuery string
+	Monochrome   bool
+}
+
+func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 	j, err := NewJsonManager(s)
 	if err != nil {
 		return nil, err
 	}
 	e := &Engine{
 		manager:       j,
-		term:          NewTerminal(FilterPrompt, DefaultY),
-		query:         NewQuery([]rune(qs)),
+		term:          NewTerminal(FilterPrompt, DefaultY, ea.Monochrome),
+		query:         NewQuery([]rune(ea.DefaultQuery)),
 		complete:      []string{"", ""},
 		keymode:       false,
 		candidates:    []string{},

@@ -15,6 +15,7 @@ type Terminal struct {
 	defaultY   int
 	prompt     string
 	formatter  *jsoncolor.Formatter
+	monochrome bool
 	outputArea *[][]termbox.Cell
 }
 
@@ -28,13 +29,17 @@ type TerminalDrawAttributes struct {
 	CursorOffset    int
 }
 
-func NewTerminal(prompt string, defaultY int) *Terminal {
+func NewTerminal(prompt string, defaultY int, monochrome bool) *Terminal {
 	t := &Terminal{
 		prompt:     prompt,
 		defaultY:   defaultY,
+		monochrome: monochrome,
 		outputArea: &[][]termbox.Cell{},
+		formatter:  nil,
 	}
-	t.formatter = t.initColorizeFormatter()
+	if !monochrome {
+		t.formatter = t.initColorizeFormatter()
+	}
 	return t
 }
 
@@ -180,18 +185,23 @@ func (t *Terminal) initColorizeFormatter() *jsoncolor.Formatter {
 
 func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 	*t.outputArea = [][]termbox.Cell{[]termbox.Cell{}}
-	err := t.formatter.Format(ioutil.Discard, []byte(strings.Join(rows, "\n")))
+
+	var err error
+
+	if t.formatter != nil {
+		err = t.formatter.Format(ioutil.Discard, []byte(strings.Join(rows, "\n")))
+	}
 
 	cells := *t.outputArea
 
-	if err != nil {
+	if err != nil || t.monochrome {
 		cells = [][]termbox.Cell{}
 		for _, row := range rows {
 			var cls []termbox.Cell
 			for _, char := range row {
 				cls = append(cls, termbox.Cell{
 					Ch: char,
-					Fg: termbox.AttrBold,
+					Fg: termbox.ColorDefault,
 					Bg: termbox.ColorDefault,
 				})
 			}
