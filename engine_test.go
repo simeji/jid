@@ -103,6 +103,16 @@ func TestScrollToBelow(t *testing.T) {
 	e.scrollToBelow()
 	assert.Equal(3, e.contentOffset)
 }
+func TestScrollToBottomAndTop(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`, "")
+
+	e.scrollToBottom(5)
+	assert.Equal(4, e.contentOffset)
+
+	e.scrollToTop()
+	assert.Equal(0, e.contentOffset)
+}
 
 func TestGetContents(t *testing.T) {
 	var assert = assert.New(t)

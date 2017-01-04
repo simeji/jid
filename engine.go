@@ -101,9 +101,13 @@ func (e *Engine) Run() EngineResultInterface {
 			e.queryCursorIdx = e.query.Length()
 		}
 
+		bl := len(contents)
 		contents = e.getContents()
 		e.setCandidateData()
 		e.queryConfirm = false
+		if bl != len(contents) {
+			e.contentOffset = 0
+		}
 
 		ta := &TerminalDrawAttributes{
 			Query:           e.query.StringGet(),
@@ -140,6 +144,10 @@ func (e *Engine) Run() EngineResultInterface {
 				e.scrollToAbove()
 			case termbox.KeyCtrlJ:
 				e.scrollToBelow()
+			case termbox.KeyCtrlG:
+				e.scrollToBottom(len(contents))
+			case termbox.KeyCtrlT:
+				e.scrollToTop()
 			case termbox.KeyCtrlL:
 				e.toggleKeymode()
 			case termbox.KeyCtrlU:
@@ -220,11 +228,21 @@ func (e *Engine) deleteLineQuery() {
 func (e *Engine) scrollToBelow() {
 	e.contentOffset++
 }
+
 func (e *Engine) scrollToAbove() {
 	if o := e.contentOffset - 1; o >= 0 {
 		e.contentOffset = o
 	}
 }
+
+func (e *Engine) scrollToBottom(rownum int) {
+	e.contentOffset = rownum - 1
+}
+
+func (e *Engine) scrollToTop() {
+	e.contentOffset = 0
+}
+
 func (e *Engine) toggleKeymode() {
 	e.keymode = !e.keymode
 }
