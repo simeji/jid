@@ -13,6 +13,7 @@ const (
 )
 
 type EngineInterface interface {
+	Eval() EngineResultInterface
 	Run() EngineResultInterface
 	GetQuery() QueryInterface
 }
@@ -297,4 +298,13 @@ func (e *Engine) moveCursorToTop() {
 }
 func (e *Engine) moveCursorToEnd() {
 	e.queryCursorIdx = e.query.Length()
+}
+
+func (e *Engine) Eval() EngineResultInterface {
+	cc, _, _, err := e.manager.Get(e.query, true)
+	return &EngineResult{
+		content: cc,
+		qs:      e.query.StringGet(),
+		err:     err,
+	}
 }
