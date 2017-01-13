@@ -323,6 +323,29 @@ func TestMoveCursorToTopAndEnd(t *testing.T) {
 	assert.Equal(3, e.queryCursorIdx)
 }
 
+func TestEngineEval(t *testing.T) {
+
+	qry := ".name"
+	buf := bytes.NewBufferString(
+		`{"name":"Doe, Jane","email":"jane.doe@example.org"}`)
+
+	ea := &EngineAttribute{
+		DefaultQuery: qry,
+		Monochrome:   true,
+	}
+	e, err := NewEngine(buf, ea)
+	if err != nil {
+		t.Errorf("new error, %s", err)
+		t.FailNow()
+	}
+	result := e.Eval()
+	if err := result.GetError(); err != nil {
+		t.Errorf("eval(), %s", err)
+		t.FailNow()
+	}
+
+}
+
 func getEngine(j string, qs string) *Engine {
 	r := bytes.NewBufferString(j)
 	e, _ := NewEngine(r, &EngineAttribute{
