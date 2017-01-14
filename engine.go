@@ -14,6 +14,7 @@ const (
 
 type EngineInterface interface {
 	Eval() EngineResultInterface
+	EvalString(string) EngineResultInterface
 	Run() EngineResultInterface
 	GetQuery() QueryInterface
 }
@@ -305,6 +306,16 @@ func (e *Engine) Eval() EngineResultInterface {
 	return &EngineResult{
 		content: cc,
 		qs:      e.query.StringGet(),
+		err:     err,
+	}
+}
+
+func (e *Engine) EvalString(s string) EngineResultInterface {
+	qry := NewQuery([]rune(s))
+	cc, _, _, err := e.manager.Get(qry, true)
+	return &EngineResult{
+		content: cc,
+		qs:      qry.StringGet(),
 		err:     err,
 	}
 }

@@ -3,6 +3,7 @@ package jid
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -324,7 +325,6 @@ func TestMoveCursorToTopAndEnd(t *testing.T) {
 }
 
 func TestEngineEval(t *testing.T) {
-
 	qry := ".name"
 	buf := bytes.NewBufferString(
 		`{"name":"Doe, Jane","email":"jane.doe@example.org"}`)
@@ -343,7 +343,40 @@ func TestEngineEval(t *testing.T) {
 		t.Errorf("eval(), %s", err)
 		t.FailNow()
 	}
+	expected := `"Doe, Jane"`
+	if s := result.GetContent(); strings.Compare(expected, s) != 0 {
+		t.Errorf("expected %q, got %q", expected, s)
+	}
+}
 
+func TestEngineEvalString(t *testing.T) {
+	buf := bytes.NewBufferString(
+		`{"name":"Doe, Jane","email":"jane.doe@example.org", "meaning_of_life":42}`)
+	testPairs := map[string]string{
+		".name":            `"Doe, Jane"`,
+		".email":           `"jane.doe@example.org"`,
+		".meaning_of_life": "42",
+	}
+
+	ea := &EngineAttribute{
+		DefaultQuery: ".",
+		Monochrome:   true,
+	}
+	e, err := NewEngine(buf, ea)
+	if err != nil {
+		t.Errorf("new error, %s", err)
+		t.FailNow()
+	}
+	for qry, expected := range testPairs {
+		result := e.EvalString(qry)
+		if err := result.GetError(); err != nil {
+			t.Errorf("eval(), %s", err)
+			t.FailNow()
+		}
+		if s := result.GetContent(); strings.Compare(expected, s) != 0 {
+			t.Errorf("expected %q, got %q", expected, s)
+		}
+	}
 }
 
 func getEngine(j string, qs string) *Engine {
