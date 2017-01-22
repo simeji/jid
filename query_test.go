@@ -399,6 +399,15 @@ func TestStringGetKeywords(t *testing.T) {
 		"name",
 	})
 
+	v = []rune(".test.name[].age")
+	q = NewQuery(v)
+	assert.Equal([]string{
+		"test",
+		"name",
+		"[]",
+		"age",
+	}, q.StringGetKeywords())
+
 	v = []rune("")
 	q = NewQuery(v)
 	kws := q.StringGetKeywords()

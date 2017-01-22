@@ -123,10 +123,7 @@ func TestGetPretty(t *testing.T) {
 
 func TestGetItem(t *testing.T) {
 	var assert = assert.New(t)
-
-	rr := bytes.NewBufferString(`{"name":"go"}`)
-	buf, _ := ioutil.ReadAll(rr)
-	sj, _ := simplejson.NewJson(buf)
+	sj := createJson(`{"name":"go"}`)
 
 	d, _ := getItem(sj, "")
 	result, _ := d.Encode()
@@ -137,18 +134,14 @@ func TestGetItem(t *testing.T) {
 	assert.Equal(`"go"`, string(result))
 
 	// case 2
-	rr = bytes.NewBufferString(`{"name":"go","age":20}`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = createJson(`{"name":"go","age":20}`)
 
 	d, _ = getItem(sj, "age")
 	result, _ = d.Encode()
 	assert.Equal("20", string(result))
 
 	// case 3
-	rr = bytes.NewBufferString(`{"data":{"name":"go","age":20}}`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = createJson((`{"data":{"name":"go","age":20}}`))
 
 	d, _ = getItem(sj, "data")
 	d2, _ := getItem(d, "name")
@@ -160,9 +153,7 @@ func TestGetItem(t *testing.T) {
 	assert.Equal(`20`, string(result3))
 
 	// case 4
-	rr = bytes.NewBufferString(`{"data":[{"name":"test","age":30},{"name":"go","age":20}]}`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = createJson(`{"data":[{"name":"test","age":30},{"name":"go","age":20}]}`)
 
 	d, _ = getItem(sj, "data")
 	d2, _ = getItem(d, "[1]")
@@ -172,9 +163,7 @@ func TestGetItem(t *testing.T) {
 	assert.Equal(`"go"`, string(result))
 
 	// case 5
-	rr = bytes.NewBufferString(`[{"name":"go","age":20}]`)
-	buf, _ = ioutil.ReadAll(rr)
-	sj, _ = simplejson.NewJson(buf)
+	sj = createJson(`[{"name":"go","age":20}]`)
 
 	d, _ = getItem(sj, "")
 	result, _ = d.Encode()
@@ -187,13 +176,38 @@ func TestGetItem(t *testing.T) {
 
 }
 
+func TestGetFilteredDataWithFlatten(t *testing.T) {
+	var assert = assert.New(t)
+
+	jm := createJsonManager(`{"data":[{"user":{"name":"simeji","number":28}},{"user":{"name":"simeji2","number":30}},{"user":{"name":"simeji3"}}]}`)
+	q := NewQueryWithString(".data")
+
+	result, _, _, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Equal(`[{"user":{"name":"simeji","number":28}},{"user":{"name":"simeji2","number":30}},{"user":{"name":"simeji3"}}]`, string(d))
+
+	q = NewQueryWithString(".data[]")
+	result, _, _, _ = jm.GetFilteredData(q, false)
+	d, _ = result.Encode()
+	assert.Equal(`[{"user":{"name":"simeji","number":28}},{"user":{"name":"simeji2","number":30}},{"user":{"name":"simeji3"}}]`, string(d))
+
+	q = NewQueryWithString(".data[].user")
+	result, _, _, _ = jm.GetFilteredData(q, false)
+	d, _ = result.Encode()
+	assert.Equal(`[{"name":"simeji","number":28},{"name":"simeji2","number":30},{"name":"simeji3}}]`, string(d))
+
+	q = NewQueryWithString(".data[].user.name")
+	result, _, _, _ = jm.GetFilteredData(q, false)
+	d, _ = result.Encode()
+	assert.Equal(`["simeji","simeji2","simeji3"]`, string(d))
+}
+
 func TestGetFilteredData(t *testing.T) {
 	var assert = assert.New(t)
 
 	// data
-	data := `{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"},"cc":{"a":[3,4]}}`
-	r := bytes.NewBufferString(data)
-	jm, _ := NewJsonManager(r)
+	jm := createJsonManager(`{"abcde":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"},"cc":{"a":[3,4]}}`)
 
 	// case 1
 	q := NewQueryWithString(".abcde")
@@ -272,9 +286,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Equal([]string{"a"}, c)
 
 	// case 2-1
-	data = `{"arraytest":[{"aaa":123,"aab":234},[1,2]]}`
-	r = bytes.NewBufferString(data)
-	jm, _ = NewJsonManager(r)
+	jm = createJsonManager(`{"arraytest":[{"aaa":123,"aab":234},[1,2]]}`)
 
 	q = NewQueryWithString(".arraytest[0]")
 	result, s, c, err = jm.GetFilteredData(q, false)
@@ -285,9 +297,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Equal([]string{}, c)
 
 	// case 3-1
-	data = `{"aa":"abcde","bb":{"foo":"bar"}}`
-	r = bytes.NewBufferString(data)
-	jm, _ = NewJsonManager(r)
+	jm = createJsonManager(`{"aa":"abcde","bb":{"foo":"bar"}}`)
 
 	q = NewQueryWithString(".bb")
 	result, s, c, err = jm.GetFilteredData(q, false)
@@ -298,9 +308,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Equal([]string{}, c)
 
 	// case 4-1
-	data = `[{"name": "simeji"},{"name": "simeji2"}]`
-	r = bytes.NewBufferString(data)
-	jm, _ = NewJsonManager(r)
+	jm = createJsonManager(`[{"name": "simeji"},{"name": "simeji2"}]`)
 
 	q = NewQueryWithString("")
 	result, s, c, err = jm.GetFilteredData(q, false)
@@ -311,9 +319,7 @@ func TestGetFilteredData(t *testing.T) {
 	assert.Equal([]string{}, c)
 
 	// case 5-1
-	data = `{"PrivateName":"simei", "PrivateAlias": "simeji2"}`
-	r = bytes.NewBufferString(data)
-	jm, _ = NewJsonManager(r)
+	jm = createJsonManager(`{"PrivateName":"simei", "PrivateAlias": "simeji2"}`)
 
 	q = NewQueryWithString(".Private")
 	result, s, c, err = jm.GetFilteredData(q, false)
@@ -393,16 +399,12 @@ func TestGetCandidateKeys(t *testing.T) {
 
 func TestGetCurrentKeys(t *testing.T) {
 	var assert = assert.New(t)
-	r := bytes.NewBufferString(`{"name":"go","age":20,"weight":60}`)
-	buf, _ := ioutil.ReadAll(r)
-	sj, _ := simplejson.NewJson(buf)
+	sj := createJson(`{"name":"go","age":20,"weight":60}`)
 
 	keys := getCurrentKeys(sj)
 	assert.Equal([]string{"age", "name", "weight"}, keys)
 
-	r = bytes.NewBufferString(`[2,3,"aa"]`)
-	buf, _ = ioutil.ReadAll(r)
-	sj, _ = simplejson.NewJson(buf)
+	sj = createJson(`[2,3,"aa"]`)
 
 	keys = getCurrentKeys(sj)
 	assert.Equal([]string{}, keys)
@@ -410,10 +412,14 @@ func TestGetCurrentKeys(t *testing.T) {
 
 func TestIsEmptyJson(t *testing.T) {
 	var assert = assert.New(t)
-	r := bytes.NewBufferString(`{"name":"go"}`)
-	buf, _ := ioutil.ReadAll(r)
-	sj, _ := simplejson.NewJson(buf)
+	sj := createJson(`{"name":"go"}`)
 
 	assert.Equal(false, isEmptyJson(sj))
 	assert.Equal(true, isEmptyJson(&simplejson.Json{}))
+}
+
+func createJsonManager(s string) *JsonManager {
+	r := bytes.NewBufferString(s)
+	jm, _ := NewJsonManager(r)
+	return jm
 }
