@@ -1,0 +1,45 @@
+ChangeLog
+=======
+
+### 0.7.2 - Jan 23 2017
+
+BugFix:
+* fix version number
+
+### 0.7.1 - Jan 5 2017
+
+Features:
+* scroll to bottom and top
+
+### 0.7.0 - Jan 4 2017
+
+Features:
+* output with color
+* monochrome mode option
+
+BugFix:
+* multibyte Query & Json key/value
+
+Modified README
+
+### 0.6.3 - 15 Dec 2016
+
+Features:
+* Add `-help` and `-h` command for show a help
+* Add Ctrl-U command and a query behavior
+
+Change Behaviors:
+* Force insert `.`
+
+### 0.6.2 - 9 Dec 2016
+
+Features:
+* Add --version flag for homebrew test
+
+### 0.6.1 - 5 Dec 2016
+
+Features:
+* Get first argument of `jid` for initial query
+
+Change Behaviors:
+* Auto input . at first charactor of query
