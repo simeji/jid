@@ -2,6 +2,7 @@ package jid
 
 import (
 	"github.com/bitly/go-simplejson"
+	"github.com/nwidger/jsoncolor"
 	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
@@ -41,7 +42,7 @@ func NewJsonManager(reader io.Reader) (*JsonManager, error) {
 func (jm *JsonManager) Get(q QueryInterface, confirm bool) (string, []string, []string, error) {
 	json, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
 
-	data, enc_err := json.Encode()
+	data, enc_err := jsoncolor.MarshalIndent(json, "", "  ")
 
 	if enc_err != nil {
 		return "", []string{"", ""}, []string{"", ""}, errors.Wrap(enc_err, "failure json encode")
