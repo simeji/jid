@@ -42,4 +42,4 @@ Features:
 * Get first argument of `jid` for initial query
 
 Change Behaviors:
-* Auto input . at first charactor of query
+* Auto input . at first character of query
