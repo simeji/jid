@@ -1,0 +1,65 @@
+version: 2
+jobs:
+  test:
+    docker:
+      - image: circleci/golang:latest
+    steps:
+      - checkout
+      - run: go get -v -t -d ./...
+      - run: go test -v ./
+      - run: go test -v ./cmd/jid
+  build:
+    docker:
+      - image: circleci/golang:latest
+    steps:
+      - checkout
+      - run: 
+          name: update packages
+          command: go get -v -t -d ./...
+      - run:
+          name: install gox
+          command: go get github.com/mitchellh/gox
+      - run:
+          name: build jid
+          command: cd cmd/jid && gox -ldflags '-w -s'
+      - persist_to_workspace:
+          root: .
+          paths:
+            - cmd/jid/*
+  deploy:
+    docker: 
+      - image: circleci/golang:latest
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: make a zip dir
+          command: mkdir builds
+      - run:
+          name: create zip files
+          command: |
+            for name in `cd cmd/jid && find jid_* | grep -v .go`; do
+              zip builds/${name}.zip cmd/jid/$name
+            done
+      - run:
+          name: list binary
+          command: ls builds
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - test
+      - build:
+          requires:
+            - test
+#          filters:
+#            tags:
+#              only: /.*/
+      - deploy:
+          requires:
+            - build
+#          filters:
+#            tags:
+#              only: /.*/
+#            branches:
+#              only: master
