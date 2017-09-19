@@ -1,4 +1,7 @@
 # jid
+
+[![Circle CI](https://circleci.com/gh/simeji/jid/tree/master.svg?style=shield)](https://circleci.com/gh/simeji/jid/tree/master)
+
 Json Incremental Digger
 
 It's a very simple tool.  
