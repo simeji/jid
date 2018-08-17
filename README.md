@@ -16,6 +16,7 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 ## Installation
 
 * [With homebrew (for Mac)](#with-homebrew-for-mac)  
+* [With pkg (for FreeBSD)](#with-pkg-for-freebsd)
 * [Simply use "jid" command](#simply-use-jid-command)  
 * [Build](#build)  
 
@@ -23,6 +24,12 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ```
 brew install jid
+```
+
+### With pkg (for FreeBSD)
+
+```
+pkg install jid
 ```
 
 ### Simply use "jid" command
