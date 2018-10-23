@@ -27,6 +27,7 @@ func main() {
 	flag.Parse()
 
 	if help {
+		flag.Usage()
 		fmt.Println(getHelpString())
 		os.Exit(0)
 	}
