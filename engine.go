@@ -35,11 +35,13 @@ type Engine struct {
 	candidateidx   int
 	contentOffset  int
 	queryConfirm   bool
+	prettyResult   bool
 }
 
 type EngineAttribute struct {
 	DefaultQuery string
 	Monochrome   bool
+	PrettyResult bool
 }
 
 func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
@@ -58,6 +60,7 @@ func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 		candidateidx:  0,
 		contentOffset: 0,
 		queryConfirm:  false,
+		prettyResult:  ea.PrettyResult,
 	}
 	e.queryCursorIdx = e.query.Length()
 	return e, nil
@@ -158,11 +161,18 @@ func (e *Engine) Run() EngineResultInterface {
 				e.escapeCandidateMode()
 			case termbox.KeyEnter:
 				if !e.candidatemode {
-					cc, _, _, err := e.manager.Get(e.query, true)
+					var cc string
+					var err error
+					if e.prettyResult {
+						cc, _, _, err = e.manager.GetPretty(e.query, true)
+					}else{
+						cc, _, _, err = e.manager.Get(e.query, true)
+					}
+
 					return &EngineResult{
-						content: cc,
-						qs:      e.query.StringGet(),
-						err:     err,
+						content:       cc,
+						qs:            e.query.StringGet(),
+						err:           err,
 					}
 				}
 				e.confirmCandidate()
