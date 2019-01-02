@@ -17,6 +17,7 @@ func main() {
 	var help bool
 	var version bool
 	var mono bool
+	var pretty bool
 	qs := "."
 
 	flag.BoolVar(&qm, "q", false, "Output query mode")
@@ -24,6 +25,7 @@ func main() {
 	flag.BoolVar(&help, "help", false, "print a help")
 	flag.BoolVar(&version, "version", false, "print the version and exit")
 	flag.BoolVar(&mono, "M", false, "monochrome output mode")
+	flag.BoolVar(&pretty, "p", false, "pretty print json result")
 	flag.Parse()
 
 	if help {
@@ -44,6 +46,7 @@ func main() {
 	ea := &jid.EngineAttribute{
 		DefaultQuery: qs,
 		Monochrome:   mono,
+		PrettyResult: pretty,
 	}
 
 	e, err := jid.NewEngine(content, ea)
