@@ -8,7 +8,7 @@ import (
 	"github.com/simeji/jid"
 )
 
-const VERSION = "0.7.2"
+var VERSION = "unknown"
 
 func main() {
 	content := os.Stdin
