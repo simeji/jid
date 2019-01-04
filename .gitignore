@@ -30,3 +30,4 @@ test.*
 jid
 *.out
 *.log
+dist
