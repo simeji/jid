@@ -5,61 +5,26 @@ jobs:
       - image: circleci/golang:latest
     steps:
       - checkout
-      - run: go get -v -t -d ./...
       - run: go test -v ./
       - run: go test -v ./cmd/jid
-  build:
+  release:
     docker:
       - image: circleci/golang:latest
     steps:
       - checkout
       - run: 
-          name: update packages
-          command: go get -v -t -d ./...
-      - run:
-          name: install gox
-          command: go get github.com/mitchellh/gox
-      - run:
-          name: build jid
-          command: cd cmd/jid && gox -ldflags '-w -s'
-      - persist_to_workspace:
-          root: .
-          paths:
-            - cmd/jid/*
-  deploy:
-    docker: 
-      - image: circleci/golang:latest
-    steps:
-      - attach_workspace:
-          at: .
-      - run:
-          name: make a zip dir
-          command: mkdir builds
-      - run:
-          name: create zip files
-          command: |
-            for name in `cd cmd/jid && find jid_* | grep -v .go`; do
-              zip builds/${name}.zip cmd/jid/$name
-            done
-      - run:
-          name: list binary
-          command: ls builds
+          name: build jid using goreleaser
+          command: curl -sL https://git.io/goreleaser | bash
 workflows:
   version: 2
-  build_and_deploy:
+  test_and_release:
     jobs:
       - test
-      - build:
+      - release:
           requires:
             - test
-#          filters:
-#            tags:
-#              only: /.*/
-      - deploy:
-          requires:
-            - build
-#          filters:
-#            tags:
-#              only: /.*/
-#            branches:
-#              only: master
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
