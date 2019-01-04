@@ -1,4 +1,4 @@
-version: 2
+tversion: 2
 jobs:
   test:
     docker:
