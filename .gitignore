@@ -29,3 +29,5 @@ test.*
 # jid package
 jid
 *.out
+*.log
+dist
