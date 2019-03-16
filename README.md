@@ -120,6 +120,8 @@ jid < file.json
 |`CTRL` + `K`|Scroll json buffer 1 line upwards|
 |`CTRL` + `G`|Scroll json buffer to bottom|
 |`CTRL` + `T`|Scroll json buffer to top|
+|`CTRL` + `N`|Scroll json buffer 'Page Down'|
+|`CTRL` + `P`|Scroll json buffer 'Page Up'|
 |`CTRL` + `L`|Change view mode whole json or keys (only object)|
 |`ESC`|Hide a candidate box|
 

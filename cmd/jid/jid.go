@@ -8,7 +8,7 @@ import (
 	"github.com/simeji/jid"
 )
 
-const VERSION = "0.7.3"
+const VERSION = "0.7.5"
 
 func main() {
 	content := os.Stdin
@@ -113,6 +113,12 @@ CTRL-G
 
 CTRL-T
   Scroll json buffer to top
+
+CTRL-N
+  Scroll json buffer 'Page Down'
+
+CTRL-P
+  Scroll json buffer 'Page Up'
 
 CTRL-L
   Change view mode whole json or keys (only object)

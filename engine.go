@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/nsf/termbox-go"
+	termbox "github.com/nsf/termbox-go"
 )
 
 const (
@@ -151,6 +151,12 @@ func (e *Engine) Run() EngineResultInterface {
 				e.scrollToBottom(len(contents))
 			case termbox.KeyCtrlT:
 				e.scrollToTop()
+			case termbox.KeyCtrlN:
+				_, h := termbox.Size()
+				e.scrollPageDown(len(contents), h)
+			case termbox.KeyCtrlP:
+				_, h := termbox.Size()
+				e.scrollPageUp(h)
 			case termbox.KeyCtrlL:
 				e.toggleKeymode()
 			case termbox.KeyCtrlU:
@@ -165,14 +171,14 @@ func (e *Engine) Run() EngineResultInterface {
 					var err error
 					if e.prettyResult {
 						cc, _, _, err = e.manager.GetPretty(e.query, true)
-					}else{
+					} else {
 						cc, _, _, err = e.manager.Get(e.query, true)
 					}
 
 					return &EngineResult{
-						content:       cc,
-						qs:            e.query.StringGet(),
-						err:           err,
+						content: cc,
+						qs:      e.query.StringGet(),
+						err:     err,
 					}
 				}
 				e.confirmCandidate()
@@ -251,6 +257,22 @@ func (e *Engine) scrollToBottom(rownum int) {
 
 func (e *Engine) scrollToTop() {
 	e.contentOffset = 0
+}
+
+func (e *Engine) scrollPageDown(rownum int, height int) {
+	co := rownum - 1
+	if o := rownum - e.contentOffset; o > height {
+		co = e.contentOffset + (height - DefaultY)
+	}
+	e.contentOffset = co
+}
+
+func (e *Engine) scrollPageUp(height int) {
+	co := 0
+	if o := e.contentOffset - (height - DefaultY); o > 0 {
+		co = o
+	}
+	e.contentOffset = co
 }
 
 func (e *Engine) toggleKeymode() {
