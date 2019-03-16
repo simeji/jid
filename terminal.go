@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mattn/go-runewidth"
-	"github.com/nsf/termbox-go"
+	runewidth "github.com/mattn/go-runewidth"
+	termbox "github.com/nsf/termbox-go"
 	"github.com/nwidger/jsoncolor"
 )
 
@@ -55,6 +55,7 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
 	y := t.defaultY
+	_, h := termbox.Size()
 
 	t.drawFilterLine(query, complete)
 
@@ -68,8 +69,12 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 	}
 
 	for idx, cells := range cellsArr {
-		if i := idx - contentOffsetY; i >= 0 {
+		i := idx - contentOffsetY
+		if i >= 0 {
 			t.drawCells(0, i+y, cells)
+		}
+		if i > h {
+			break
 		}
 	}
 
