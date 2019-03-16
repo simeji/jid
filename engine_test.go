@@ -114,6 +114,43 @@ func TestScrollToBottomAndTop(t *testing.T) {
 	assert.Equal(0, e.contentOffset)
 }
 
+func TestScrollPageUpDown(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`{"named":"go","NameTest":[1,2,3]}`, "")
+
+	cl := len(e.getContents())
+	// Then DefaultY = 1
+	e.scrollPageDown(cl, 3)
+	assert.Equal(2, e.contentOffset)
+	e.scrollPageDown(cl, 3)
+	assert.Equal(4, e.contentOffset)
+
+	e.scrollPageUp(3)
+	assert.Equal(2, e.contentOffset)
+
+	// term height changed
+	e.scrollPageDown(cl, 5)
+	assert.Equal(6, e.contentOffset)
+
+	e.scrollPageDown(cl, 5)
+	assert.Equal(7, e.contentOffset)
+
+	e.scrollPageDown(cl, 5)
+	assert.Equal(7, e.contentOffset)
+
+	e.scrollPageUp(5)
+	assert.Equal(3, e.contentOffset)
+
+	e.scrollPageUp(5)
+	assert.Equal(0, e.contentOffset)
+
+	e.scrollPageUp(5)
+	assert.Equal(0, e.contentOffset)
+
+	// term height > content size + default Y (a filter query line)
+	e.scrollPageDown(cl, 10)
+	assert.Equal(7, e.contentOffset)
+}
 func TestGetContents(t *testing.T) {
 	var assert = assert.New(t)
 
