@@ -17,6 +17,7 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 * [With homebrew (for Mac)](#with-homebrew-for-mac)  
 * [With pkg (for FreeBSD)](#with-pkg-for-freebsd)
+* [Other package management system](Other-pkg-management-system)
 * [Simply use "jid" command](#simply-use-jid-command)  
 * [Build](#build)  
 
@@ -31,6 +32,13 @@ brew install jid
 ```
 pkg install jid
 ```
+
+### Other package management system
+
+Jid can install by package management systems of below OS.
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/jid.svg)](https://repology.org/metapackage/jid/versions)
+
 
 ### Simply use "jid" command
 
