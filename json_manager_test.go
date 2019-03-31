@@ -2,10 +2,11 @@ package jid
 
 import (
 	"bytes"
-	"github.com/bitly/go-simplejson"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
+
+	simplejson "github.com/bitly/go-simplejson"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewJson(t *testing.T) {
@@ -185,6 +186,15 @@ func TestGetItem(t *testing.T) {
 	result, _ = d.Encode()
 	assert.Equal(`{"age":20,"name":"go"}`, string(result))
 
+	// case 7  key contains '.'
+	rr = bytes.NewBufferString(`{"na.me":"go","age":20}`)
+	buf, _ = ioutil.ReadAll(rr)
+	sj, _ = simplejson.NewJson(buf)
+
+	d, _ = getItem(sj, "na.me")
+	result, _ = d.Encode()
+	assert.Equal(`"go"`, string(result))
+
 }
 
 func TestGetFilteredData(t *testing.T) {
@@ -361,6 +371,42 @@ func TestGetFilteredDataWithMatchQuery(t *testing.T) {
 	assert.Equal(`{"name":[1,2,3],"naming":{"account":"simeji"},"test":"simeji","testing":"ok"}`, string(d))
 	assert.Equal([]string{"", "test"}, s)
 	assert.Equal([]string{"test", "testing"}, c)
+}
+
+func TestGetFilteredDataWithContainDots(t *testing.T) {
+	var assert = assert.New(t)
+
+	// data
+	data := `{"abc.de":"2AA2","abcde_fgh":{"aaa":[123,"cccc",[1,2]],"c":"JJJJ"},"cc":{"a":[3,4]}}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// case 1
+	q := NewQueryWithString(`.\"abc.de\"`)
+	result, s, c, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Equal(`"2AA2"`, string(d))
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
+
+	// case 2
+	q = NewQueryWithString(`."abc.de"`)
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`null`, string(d))
+	assert.Equal([]string{``, ``}, s)
+	assert.Equal([]string{}, c)
+
+	// case 3
+	q = NewQueryWithString(`.abc.de`)
+	result, s, c, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`null`, string(d))
+	assert.Equal([]string{"", ""}, s)
+	assert.Equal([]string{}, c)
 }
 
 func TestGetCandidateKeys(t *testing.T) {

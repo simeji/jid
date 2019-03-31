@@ -1,8 +1,9 @@
 package jid
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidate(t *testing.T) {
@@ -226,22 +227,22 @@ func TestGetKeywords(t *testing.T) {
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("test"),
 		[]rune("name"),
-	})
+	}, q.GetKeywords())
 
 	v = []rune("")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{})
+	assert.Equal([][]rune{}, q.GetKeywords())
 
 	v = []rune(".test.name.")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("test"),
 		[]rune("name"),
 		[]rune(""),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".hello")
 	q = NewQuery(v)
@@ -296,6 +297,25 @@ func TestGetKeywords(t *testing.T) {
 	})
 
 }
+func TestGetKeywordsWithDots(t *testing.T) {
+	var assert = assert.New(t)
+
+	v := []rune(`.test.\"na.me\"`)
+	q := NewQuery(v)
+	assert.Equal([][]rune{
+		[]rune("test"),
+		[]rune("na.me"),
+	}, q.GetKeywords())
+
+	v = []rune(`.test.\"na.me\`)
+	q = NewQuery(v)
+	assert.Equal([][]rune{
+		[]rune("test"),
+		[]rune("na"),
+		[]rune(`me\`),
+	}, q.GetKeywords())
+
+}
 
 func TestGetLastKeyword(t *testing.T) {
 	var assert = assert.New(t)
@@ -343,16 +363,56 @@ func TestPopKeyword(t *testing.T) {
 	v := []rune(".test.name")
 	q := NewQuery(v)
 	k, query := q.PopKeyword()
-	assert.Equal(k, []rune("name"))
-	assert.Equal(query, []rune(".test"))
-	assert.Equal(q.Get(), []rune(".test"))
+	assert.Equal([]rune("name"), k)
+	assert.Equal([]rune(".test"), query)
+	assert.Equal([]rune(".test"), q.Get())
+
+	v = []rune(".a[0")
+	q = NewQuery(v)
+	k, query = q.PopKeyword()
+	assert.Equal([]rune("[0"), k)
+	assert.Equal([]rune(".a"), query)
+	assert.Equal([]rune(".a"), q.Get())
+
+	k, query = q.PopKeyword()
+	assert.Equal([]rune("a"), k)
+	assert.Equal([]rune(""), query)
+	assert.Equal([]rune(""), q.Get())
+
+	v = []rune(".")
+	q = NewQuery(v)
+	k, query = q.PopKeyword()
+	assert.Equal([]rune(""), k)
+	assert.Equal([]rune(""), query)
+	assert.Equal([]rune(""), q.Get())
 
 	v = []rune(".test.name.")
 	q = NewQuery(v)
 	k, query = q.PopKeyword()
-	assert.Equal(k, []rune(""))
-	assert.Equal(query, []rune(".test.name"))
-	assert.Equal(q.Get(), []rune(".test.name"))
+	assert.Equal([]rune(""), k)
+	assert.Equal([]rune(".test.name"), query)
+	assert.Equal([]rune(".test.name"), q.Get())
+
+	v = []rune(`.name.\"te.st\"`)
+	q = NewQuery(v)
+	k, query = q.PopKeyword()
+	assert.Equal([]rune("te.st"), k)
+	assert.Equal([]rune(".name"), query)
+	assert.Equal([]rune(".name"), q.Get())
+
+	v = []rune(`.name.\"te.st\".hoge`)
+	q = NewQuery(v)
+	k, query = q.PopKeyword()
+	assert.Equal([]rune("hoge"), k)
+	assert.Equal([]rune(`.name.\"te.st\"`), query)
+	assert.Equal([]rune(`.name.\"te.st\"`), q.Get())
+
+	v = []rune(`.name.\"te`)
+	q = NewQuery(v)
+	k, query = q.PopKeyword()
+	assert.Equal([]rune(`te`), k)
+	assert.Equal([]rune(`.name`), query)
+	assert.Equal([]rune(`.name`), q.Get())
 }
 
 func TestQueryStringGet(t *testing.T) {

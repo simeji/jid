@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mattn/go-runewidth"
+	runewidth "github.com/mattn/go-runewidth"
 )
 
 type QueryInterface interface {
@@ -128,13 +128,37 @@ func (q *Query) Clear() []rune {
 }
 
 func (q *Query) GetKeywords() [][]rune {
-	query := string(*q.query)
+	qq := *q.query
 
-	if query == "" {
+	if qq == nil || string(qq) == "" {
 		return [][]rune{}
 	}
 
-	splitQuery := strings.Split(query, ".")
+	splitQuery := []string{}
+	rr := []rune{}
+	enclosed := true
+	ql := len(*q.query)
+	for i := 0; i < ql; i++ {
+		r := qq[i]
+		if ii := i + 1; r == '\\' && ql > ii && qq[ii] == '"' {
+			enclosed = !enclosed
+			i++ // skip '"(double quortation)'
+			continue
+		}
+		if enclosed && r == '.' {
+			splitQuery = append(splitQuery, string(rr))
+			rr = []rune{}
+		} else {
+			rr = append(rr, r)
+		}
+	}
+	if rr != nil {
+		v := []string{string(rr)}
+		if !enclosed {
+			v = strings.Split(string(rr), ".")
+		}
+		splitQuery = append(splitQuery, v...)
+	}
 	lastIdx := len(splitQuery) - 1
 
 	keywords := [][]rune{}
@@ -171,27 +195,21 @@ func (q *Query) StringGetLastKeyword() string {
 }
 
 func (q *Query) PopKeyword() ([]rune, []rune) {
-	var keyword []rune
-	var lastSepIdx int
-	var lastBracketIdx int
-	qq := q.Get()
-	for i, e := range qq {
-		if e == '.' {
-			lastSepIdx = i
-		} else if e == '[' {
-			lastBracketIdx = i
+	keyword := q.GetLastKeyword()
+	nq := string(keyword)
+	qq := q.StringGet()
+
+	for _, r := range keyword {
+		if r == '.' {
+			nq = `\"` + string(keyword) + `\"`
+			break
 		}
 	}
+	re := regexp.MustCompile(`(\.)?(\\")?` + regexp.QuoteMeta(nq) + "$")
 
-	if lastBracketIdx > lastSepIdx {
-		lastSepIdx = lastBracketIdx
-	}
+	qq = re.ReplaceAllString(qq, "")
 
-	keywords := q.GetKeywords()
-	if l := len(keywords); l > 0 {
-		keyword = keywords[l-1]
-	}
-	query := q.Set(qq[0:lastSepIdx])
+	query := q.Set([]rune(qq))
 	return keyword, query
 }
 

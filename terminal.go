@@ -238,7 +238,7 @@ func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) 
 	w, _ := termbox.Size()
 
 	ss := candidates[index]
-	re := regexp.MustCompile("[[:space:]]" + ss + "[[:space:]]")
+	re := regexp.MustCompile("[[:space:]]" + regexp.QuoteMeta(ss) + "[[:space:]]")
 
 	var rows []string
 	var str string

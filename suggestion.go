@@ -1,10 +1,11 @@
 package jid
 
 import (
-	"github.com/bitly/go-simplejson"
 	"regexp"
 	"sort"
 	"strings"
+
+	simplejson "github.com/bitly/go-simplejson"
 )
 
 type SuggestionInterface interface {
@@ -97,7 +98,7 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 		return getCurrentKeys(json)
 	}
 
-	reg, err := regexp.Compile("(?i)^" + keyword)
+	reg, err := regexp.Compile(`(?i)^(\\")?` + keyword + `(\\")?`)
 	if err != nil {
 		return []string{}
 	}
@@ -111,16 +112,29 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 
 func getCurrentKeys(json *simplejson.Json) []string {
 
-	keys := []string{}
+	kk := []string{}
 	m, err := json.Map()
 
 	if err != nil {
-		return keys
+		return kk
 	}
 	for k := range m {
+		kk = append(kk, k)
+	}
+	sort.Strings(kk)
+
+	keys := []string{}
+	for _, k := range kk {
+		if strings.Contains(k, ".") {
+			var sb strings.Builder
+			sb.Grow(len(k) + 4)
+			sb.WriteString(`\"`)
+			sb.WriteString(k)
+			sb.WriteString(`\"`)
+			k = sb.String()
+		}
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
 	return keys
 }
 
