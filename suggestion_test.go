@@ -2,10 +2,11 @@ package jid
 
 import (
 	"bytes"
-	"github.com/bitly/go-simplejson"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
+
+	simplejson "github.com/bitly/go-simplejson"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewSuggestion(t *testing.T) {
@@ -82,6 +83,14 @@ func TestSuggestionGetCandidateKeys(t *testing.T) {
 	j = createJson(`[1,2,"aa"]`)
 	s = NewSuggestion()
 	assert.Equal([]string{}, s.GetCandidateKeys(j, "["))
+}
+func TestSuggestionGetCandidateKeysWithDots(t *testing.T) {
+	var assert = assert.New(t)
+	j := createJson(`{"nam.ing":"simeji", "nickname":"simejisimeji", "city":"tokyo", "name":"simeji-github" }`)
+	s := NewSuggestion()
+
+	assert.Equal([]string{"city", `\"nam.ing\"`, "name", "nickname"}, s.GetCandidateKeys(j, ""))
+	assert.Equal([]string{`\"nam.ing\"`, "name", "nickname"}, s.GetCandidateKeys(j, "n"))
 }
 
 func createJson(s string) *simplejson.Json {
