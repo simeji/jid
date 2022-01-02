@@ -56,7 +56,7 @@ https://github.com/simeji/jid/releases
 ## Build
 
 ```
-go get -u github.com/simeji/jid/cmd/jid
+go install github.com/simeji/jid/cmd/jid@latest
 ```
 
 ## Usage
