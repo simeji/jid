@@ -15,17 +15,24 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ## Installation
 
-* [With homebrew (for Mac)](#with-homebrew-for-mac)  
+* [With HomeBrew (for macOS)](#with-homebrew-for-macos)  
+* [With MacPorts (for macOS)](#with-macports-for-macos)  
 * [With pkg (for FreeBSD)](#with-pkg-for-freebsd)
 * [With scoop (for Windows)](#with-scoop-for-windows)
 * [Other package management system](#other-package-management-systems)
 * [Simply use "jid" command](#simply-use-jid-command)  
 * [Build](#build)  
 
-### With homebrew (for Mac)
+### With HomeBrew (for macOS)
 
 ```
 brew install jid
+```
+
+### With MacPorts (for macOS)
+
+```
+sudo port install jid
 ```
 
 ### With pkg (for FreeBSD)
