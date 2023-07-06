@@ -2,7 +2,7 @@ package jid
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	simplejson "github.com/bitly/go-simplejson"
@@ -16,7 +16,7 @@ func TestNewJson(t *testing.T) {
 	jm, e := NewJsonManager(r)
 
 	rr := bytes.NewBufferString("{\"name\":\"go\"}")
-	buf, _ := ioutil.ReadAll(rr)
+	buf, _ := io.ReadAll(rr)
 	sj, _ := simplejson.NewJson(buf)
 
 	assert.Equal(jm, &JsonManager{
@@ -126,7 +126,7 @@ func TestGetItem(t *testing.T) {
 	var assert = assert.New(t)
 
 	rr := bytes.NewBufferString(`{"name":"go"}`)
-	buf, _ := ioutil.ReadAll(rr)
+	buf, _ := io.ReadAll(rr)
 	sj, _ := simplejson.NewJson(buf)
 
 	d, _ := getItem(sj, "")
@@ -139,7 +139,7 @@ func TestGetItem(t *testing.T) {
 
 	// case 2
 	rr = bytes.NewBufferString(`{"name":"go","age":20}`)
-	buf, _ = ioutil.ReadAll(rr)
+	buf, _ = io.ReadAll(rr)
 	sj, _ = simplejson.NewJson(buf)
 
 	d, _ = getItem(sj, "age")
@@ -148,7 +148,7 @@ func TestGetItem(t *testing.T) {
 
 	// case 3
 	rr = bytes.NewBufferString(`{"data":{"name":"go","age":20}}`)
-	buf, _ = ioutil.ReadAll(rr)
+	buf, _ = io.ReadAll(rr)
 	sj, _ = simplejson.NewJson(buf)
 
 	d, _ = getItem(sj, "data")
@@ -162,7 +162,7 @@ func TestGetItem(t *testing.T) {
 
 	// case 4
 	rr = bytes.NewBufferString(`{"data":[{"name":"test","age":30},{"name":"go","age":20}]}`)
-	buf, _ = ioutil.ReadAll(rr)
+	buf, _ = io.ReadAll(rr)
 	sj, _ = simplejson.NewJson(buf)
 
 	d, _ = getItem(sj, "data")
@@ -174,7 +174,7 @@ func TestGetItem(t *testing.T) {
 
 	// case 5
 	rr = bytes.NewBufferString(`[{"name":"go","age":20}]`)
-	buf, _ = ioutil.ReadAll(rr)
+	buf, _ = io.ReadAll(rr)
 	sj, _ = simplejson.NewJson(buf)
 
 	d, _ = getItem(sj, "")
@@ -188,7 +188,7 @@ func TestGetItem(t *testing.T) {
 
 	// case 7  key contains '.'
 	rr = bytes.NewBufferString(`{"na.me":"go","age":20}`)
-	buf, _ = ioutil.ReadAll(rr)
+	buf, _ = io.ReadAll(rr)
 	sj, _ = simplejson.NewJson(buf)
 
 	d, _ = getItem(sj, "na.me")
@@ -440,14 +440,14 @@ func TestGetCandidateKeys(t *testing.T) {
 func TestGetCurrentKeys(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go","age":20,"weight":60}`)
-	buf, _ := ioutil.ReadAll(r)
+	buf, _ := io.ReadAll(r)
 	sj, _ := simplejson.NewJson(buf)
 
 	keys := getCurrentKeys(sj)
 	assert.Equal([]string{"age", "name", "weight"}, keys)
 
 	r = bytes.NewBufferString(`[2,3,"aa"]`)
-	buf, _ = ioutil.ReadAll(r)
+	buf, _ = io.ReadAll(r)
 	sj, _ = simplejson.NewJson(buf)
 
 	keys = getCurrentKeys(sj)
@@ -457,7 +457,7 @@ func TestGetCurrentKeys(t *testing.T) {
 func TestIsEmptyJson(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go"}`)
-	buf, _ := ioutil.ReadAll(r)
+	buf, _ := io.ReadAll(r)
 	sj, _ := simplejson.NewJson(buf)
 
 	assert.Equal(false, isEmptyJson(sj))

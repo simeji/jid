@@ -2,7 +2,7 @@ package jid
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"regexp"
 	"strings"
 
@@ -194,7 +194,7 @@ func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 	var err error
 
 	if t.formatter != nil {
-		err = t.formatter.Format(ioutil.Discard, []byte(strings.Join(rows, "\n")))
+		err = t.formatter.Format(io.Discard, []byte(strings.Join(rows, "\n")))
 	}
 
 	cells := *t.outputArea

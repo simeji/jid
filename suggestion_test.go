@@ -2,7 +2,7 @@ package jid
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	simplejson "github.com/bitly/go-simplejson"
@@ -95,7 +95,7 @@ func TestSuggestionGetCandidateKeysWithDots(t *testing.T) {
 
 func createJson(s string) *simplejson.Json {
 	r := bytes.NewBufferString(s)
-	buf, _ := ioutil.ReadAll(r)
+	buf, _ := io.ReadAll(r)
 	j, _ := simplejson.NewJson(buf)
 	return j
 }
