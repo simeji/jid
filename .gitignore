@@ -31,3 +31,5 @@ jid
 *.out
 *.log
 dist
+
+.idea
