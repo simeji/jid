@@ -4,7 +4,6 @@ import (
 	"github.com/bitly/go-simplejson"
 	"github.com/pkg/errors"
 	"io"
-	"io/ioutil"
 	"regexp"
 	"strconv"
 	//"strings"
@@ -17,7 +16,7 @@ type JsonManager struct {
 }
 
 func NewJsonManager(reader io.Reader) (*JsonManager, error) {
-	buf, err := ioutil.ReadAll(reader)
+	buf, err := io.ReadAll(reader)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid data")
