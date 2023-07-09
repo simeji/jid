@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 jobs:
   test:
     docker:
@@ -16,7 +16,7 @@ jobs:
           name: build jid using goreleaser
           command: curl -sL https://git.io/goreleaser | bash
 workflows:
-  version: 2
+  version: 2.1
   test_and_release:
     jobs:
       - test:
