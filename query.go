@@ -40,8 +40,10 @@ func NewQuery(query []rune) *Query {
 		complete: &[]rune{},
 	}
 	_ = q.Set(query)
+
 	return q
 }
+
 func NewQueryWithString(query string) *Query {
 	return NewQuery([]rune(query))
 }
@@ -52,10 +54,12 @@ func (q *Query) Get() []rune {
 
 func (q *Query) GetChar(idx int) rune {
 	var r rune = 0
+
 	qq := q.Get()
 	if l := len(qq); l > idx && idx >= 0 {
 		r = qq[idx]
 	}
+
 	return r
 }
 
@@ -70,6 +74,7 @@ func (q *Query) IndexOffset(i int) int {
 	} else if i >= 0 && i < l {
 		o = runewidth.StringWidth(string(q.Get()[:i]))
 	}
+
 	return o
 }
 
@@ -77,6 +82,7 @@ func (q *Query) Set(query []rune) []rune {
 	if validate(query) {
 		q.query = &query
 	}
+
 	return q.Get()
 }
 
@@ -89,6 +95,7 @@ func (q *Query) Insert(query []rune, idx int) []rune {
 		copy(_q, qq[:idx])
 		qq = append(append(_q, query...), qq[idx:]...)
 	}
+
 	return q.Set(qq)
 }
 
@@ -102,7 +109,9 @@ func (q *Query) Add(query []rune) []rune {
 
 func (q *Query) Delete(i int) []rune {
 	var d []rune
+
 	qq := q.Get()
+
 	lastIdx := len(qq)
 	if i < 0 {
 		if lastIdx+i >= 0 {
@@ -119,7 +128,9 @@ func (q *Query) Delete(i int) []rune {
 		d = []rune{qq[i]}
 		qq = append(qq[:i], qq[i+1:]...)
 	}
+
 	_ = q.Set(qq)
+
 	return d
 }
 
@@ -137,14 +148,17 @@ func (q *Query) GetKeywords() [][]rune {
 	splitQuery := []string{}
 	rr := []rune{}
 	enclosed := true
+
 	ql := len(*q.query)
 	for i := 0; i < ql; i++ {
 		r := qq[i]
 		if ii := i + 1; r == '\\' && ql > ii && qq[ii] == '"' {
 			enclosed = !enclosed
 			i++ // skip '"(double quortation)'
+
 			continue
 		}
+
 		if enclosed && r == '.' {
 			splitQuery = append(splitQuery, string(rr))
 			rr = []rune{}
@@ -152,19 +166,24 @@ func (q *Query) GetKeywords() [][]rune {
 			rr = append(rr, r)
 		}
 	}
+
 	if rr != nil {
 		v := []string{string(rr)}
 		if !enclosed {
 			v = strings.Split(string(rr), ".")
 		}
+
 		splitQuery = append(splitQuery, v...)
 	}
+
 	lastIdx := len(splitQuery) - 1
 
 	keywords := [][]rune{}
+
 	for i, keyword := range splitQuery {
 		if keyword != "" || i == lastIdx {
 			re := regexp.MustCompile(`\[[0-9]*\]?`)
+
 			matchIndexes := re.FindAllStringIndex(keyword, -1)
 			if len(matchIndexes) < 1 {
 				keywords = append(keywords, []rune(keyword))
@@ -172,6 +191,7 @@ func (q *Query) GetKeywords() [][]rune {
 				if matchIndexes[0][0] > 0 {
 					keywords = append(keywords, []rune(keyword[0:matchIndexes[0][0]]))
 				}
+
 				for _, matchIndex := range matchIndexes {
 					k := keyword[matchIndex[0]:matchIndex[1]]
 					keywords = append(keywords, []rune(k))
@@ -179,6 +199,7 @@ func (q *Query) GetKeywords() [][]rune {
 			}
 		}
 	}
+
 	return keywords
 }
 
@@ -187,6 +208,7 @@ func (q *Query) GetLastKeyword() []rune {
 	if l := len(keywords); l > 0 {
 		return keywords[l-1]
 	}
+
 	return []rune("")
 }
 
@@ -202,14 +224,17 @@ func (q *Query) PopKeyword() ([]rune, []rune) {
 	for _, r := range keyword {
 		if r == '.' {
 			nq = `\"` + string(keyword) + `\"`
+
 			break
 		}
 	}
+
 	re := regexp.MustCompile(`(\.)?(\\")?` + regexp.QuoteMeta(nq) + "$")
 
 	qq = re.ReplaceAllString(qq, "")
 
 	query := q.Set([]rune(qq))
+
 	return keyword, query
 }
 
@@ -230,11 +255,13 @@ func (q *Query) StringGetKeywords() []string {
 	for _, keyword := range q.GetKeywords() {
 		keywords = append(keywords, string(keyword))
 	}
+
 	return keywords
 }
 
 func (q *Query) StringPopKeyword() (string, []rune) {
 	keyword, query := q.PopKeyword()
+
 	return string(keyword), query
 }
 
@@ -243,20 +270,26 @@ func validate(r []rune) bool {
 	if s == "" {
 		return true
 	}
+
 	if regexp.MustCompile(`^[^.]`).MatchString(s) {
 		return false
 	}
+
 	if regexp.MustCompile(`\.{2,}`).MatchString(s) {
 		return false
 	}
+
 	if regexp.MustCompile(`\[[0-9]*\][^\.\[]`).MatchString(s) {
 		return false
 	}
+
 	if regexp.MustCompile(`\[{2,}|\]{2,}`).MatchString(s) {
 		return false
 	}
+
 	if regexp.MustCompile(`.\.\[`).MatchString(s) {
 		return false
 	}
+
 	return true
 }

@@ -40,11 +40,11 @@ func NewTerminal(prompt string, defaultY int, monochrome bool) *Terminal {
 	if !monochrome {
 		t.formatter = t.initColorizeFormatter()
 	}
+
 	return t
 }
 
 func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
-
 	query := attr.Query
 	complete := attr.Complete
 	rows := attr.Contents
@@ -73,6 +73,7 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 		if i >= 0 {
 			t.drawCells(0, i+y, cells)
 		}
+
 		if i > h {
 			break
 		}
@@ -81,10 +82,11 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 	termbox.SetCursor(len(t.prompt)+attr.CursorOffset, 0)
 
 	termbox.Flush()
+
 	return nil
 }
 
-func (t *Terminal) drawFilterLine(qs string, complete string) error {
+func (t *Terminal) drawFilterLine(qs, complete string) error {
 	fs := t.prompt + qs
 	cs := complete
 	str := fs + cs
@@ -93,6 +95,7 @@ func (t *Terminal) drawFilterLine(qs string, complete string) error {
 	backgroundColor := termbox.ColorDefault
 
 	var cells []termbox.Cell
+
 	match := []int{len(fs), len(fs + cs)}
 
 	var c termbox.Attribute
@@ -101,13 +104,16 @@ func (t *Terminal) drawFilterLine(qs string, complete string) error {
 		if i >= match[0] && i < match[1] {
 			c = termbox.ColorGreen
 		}
+
 		cells = append(cells, termbox.Cell{
 			Ch: s,
 			Fg: c,
 			Bg: backgroundColor,
 		})
 	}
+
 	t.drawCells(0, 0, cells)
+
 	return nil
 }
 
@@ -117,23 +123,27 @@ type termboxSprintfFuncer struct {
 	outputArea *[][]termbox.Cell
 }
 
-func (tsf *termboxSprintfFuncer) SprintfFunc() func(format string, a ...interface{}) string {
-	return func(format string, a ...interface{}) string {
+func (tsf *termboxSprintfFuncer) SprintfFunc() func(format string, a ...any) string {
+	return func(format string, a ...any) string {
 		cells := tsf.outputArea
 		idx := len(*cells) - 1
+
 		str := fmt.Sprintf(format, a...)
 		for _, s := range str {
 			if s == '\n' {
 				*cells = append(*cells, []termbox.Cell{})
 				idx++
+
 				continue
 			}
+
 			(*cells)[idx] = append((*cells)[idx], termbox.Cell{
 				Ch: s,
 				Fg: tsf.fg,
 				Bg: tsf.bg,
 			})
 		}
+
 		return "dummy"
 	}
 }
@@ -189,7 +199,7 @@ func (t *Terminal) initColorizeFormatter() *jsoncolor.Formatter {
 }
 
 func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
-	*t.outputArea = [][]termbox.Cell{[]termbox.Cell{}}
+	*t.outputArea = [][]termbox.Cell{{}}
 
 	var err error
 
@@ -201,6 +211,7 @@ func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 
 	if err != nil || t.monochrome {
 		cells = [][]termbox.Cell{}
+
 		for _, row := range rows {
 			var cls []termbox.Cell
 			for _, char := range row {
@@ -210,6 +221,7 @@ func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 					Bg: termbox.ColorDefault,
 				})
 			}
+
 			cells = append(cells, cls)
 		}
 	}
@@ -217,7 +229,7 @@ func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 	return cells, nil
 }
 
-func (t *Terminal) drawCells(x int, y int, cells []termbox.Cell) {
+func (t *Terminal) drawCells(x, y int, cells []termbox.Cell) {
 	i := 0
 	for _, c := range cells {
 		termbox.SetCell(x+i, y, c.Ch, c.Fg, c.Bg)
@@ -231,7 +243,7 @@ func (t *Terminal) drawCells(x int, y int, cells []termbox.Cell) {
 	}
 }
 
-func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) int {
+func (t *Terminal) drawCandidates(x, y, index int, candidates []string) int {
 	color := termbox.ColorBlack
 	backgroundColor := termbox.ColorWhite
 
@@ -241,34 +253,47 @@ func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) 
 	re := regexp.MustCompile("[[:space:]]" + regexp.QuoteMeta(ss) + "[[:space:]]")
 
 	var rows []string
+
 	var str string
+
 	for _, word := range candidates {
 		combine := " "
+
 		if l := len(str); l+len(word)+1 >= w {
 			rows = append(rows, str+" ")
 			str = ""
 		}
+
 		str += combine + word
 	}
+
 	rows = append(rows, str+" ")
 
 	for i, row := range rows {
 		match := re.FindStringIndex(row)
+
 		var c termbox.Attribute
+
 		ii := 0
+
 		for k, s := range row {
 			c = color
+
 			backgroundColor = termbox.ColorMagenta
 			if match != nil && k >= match[0]+1 && k < match[1]-1 {
 				backgroundColor = termbox.ColorWhite
 			}
+
 			termbox.SetCell(x+ii, y+i, s, c, backgroundColor)
+
 			w := runewidth.RuneWidth(s)
 			if w == 0 || w == 2 && runewidth.IsAmbiguousWidth(s) {
 				w = 1
 			}
+
 			ii += w
 		}
 	}
+
 	return y + len(rows)
 }

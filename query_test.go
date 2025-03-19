@@ -7,7 +7,7 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	assert.True(validate([]rune(".test.name")))
 	assert.True(validate([]rune(".test.name.")))
@@ -26,7 +26,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestNewQuery(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".name")
 	q := NewQuery(v)
@@ -36,7 +36,7 @@ func TestNewQuery(t *testing.T) {
 }
 
 func TestNewQueryWithInvalidQuery(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune("name")
 	q := NewQuery(v)
@@ -46,7 +46,7 @@ func TestNewQueryWithInvalidQuery(t *testing.T) {
 }
 
 func TestNewQueryWithString(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	q := NewQueryWithString(".name")
 
@@ -55,7 +55,7 @@ func TestNewQueryWithString(t *testing.T) {
 }
 
 func TestNewQueryWithStringWithInvalidQuery(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	q := NewQueryWithString("name")
 
@@ -64,7 +64,7 @@ func TestNewQueryWithStringWithInvalidQuery(t *testing.T) {
 }
 
 func TestQueryGet(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test")
 	q := NewQuery(v)
@@ -73,7 +73,7 @@ func TestQueryGet(t *testing.T) {
 }
 
 func TestQueryLength(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test")
 	q := NewQuery(v)
@@ -87,7 +87,7 @@ func TestQueryLength(t *testing.T) {
 }
 
 func TestQueryIndexOffsetN(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test")
 	q := NewQuery(v)
@@ -97,9 +97,9 @@ func TestQueryIndexOffsetN(t *testing.T) {
 	assert.Equal(0, q.IndexOffset(-1))
 	assert.Equal(5, q.IndexOffset(6))
 
-	//off-------012345679-101213|j_15,n_19
+	// off-------012345679-101213|j_15,n_19
 	v = []rune(".string.日本語.japan")
-	//idx-------012345678-9-10|j_12,n_16
+	// idx-------012345678-9-10|j_12,n_16
 	q = NewQuery(v)
 
 	assert.Equal(19, q.IndexOffset(16))
@@ -107,7 +107,7 @@ func TestQueryIndexOffsetN(t *testing.T) {
 }
 
 func TestQueryGetChar(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test")
 	q := NewQuery(v)
@@ -129,7 +129,7 @@ func TestQueryGetChar(t *testing.T) {
 }
 
 func TestQuerySet(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".hello")
 	q := NewQuery(v)
@@ -139,7 +139,7 @@ func TestQuerySet(t *testing.T) {
 }
 
 func TestQuerySetWithInvalidQuery(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".hello")
 	q := NewQuery(v)
@@ -148,15 +148,16 @@ func TestQuerySetWithInvalidQuery(t *testing.T) {
 }
 
 func TestQueryAdd(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".hello")
 	q := NewQuery(v)
 
 	assert.Equal(q.Add([]rune("world")), []rune(".helloworld"))
 }
+
 func TestQueryInsert(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 	v := []rune(".hello.world")
 	q := NewQuery(v)
 
@@ -168,8 +169,9 @@ func TestQueryInsert(t *testing.T) {
 	assert.Equal([]rune(".wwh.ello.worldg"), q.Insert([]rune("g"), 15))
 	assert.Equal([]rune(".wwh.ello.worldg"), q.Insert([]rune("a"), 20))
 }
+
 func TestQueryStringInsert(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 	q := NewQueryWithString(".hello.world")
 
 	assert.Equal(".hello.world", q.StringInsert("w", 0))
@@ -182,7 +184,7 @@ func TestQueryStringInsert(t *testing.T) {
 }
 
 func TestQueryClear(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test")
 	q := NewQuery(v)
@@ -191,7 +193,7 @@ func TestQueryClear(t *testing.T) {
 }
 
 func TestQueryDelete(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".helloworld")
 	q := NewQuery(v)
@@ -223,7 +225,7 @@ func TestQueryDelete(t *testing.T) {
 }
 
 func TestGetKeywords(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
@@ -246,59 +248,59 @@ func TestGetKeywords(t *testing.T) {
 
 	v = []rune(".hello")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("hello"),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".hello.")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("hello"),
 		[]rune(""),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".hello[")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("hello"),
 		[]rune("["),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".hello[12")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("hello"),
 		[]rune("[12"),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".hello[0]")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("hello"),
 		[]rune("[0]"),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".hello[13][0]")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("hello"),
 		[]rune("[13]"),
 		[]rune("[0]"),
-	})
+	}, q.GetKeywords())
 
 	v = []rune(".[3][23].hello[13][0]")
 	q = NewQuery(v)
-	assert.Equal(q.GetKeywords(), [][]rune{
+	assert.Equal([][]rune{
 		[]rune("[3]"),
 		[]rune("[23]"),
 		[]rune("hello"),
 		[]rune("[13]"),
 		[]rune("[0]"),
-	})
-
+	}, q.GetKeywords())
 }
+
 func TestGetKeywordsWithDots(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(`.test.\"na.me\"`)
 	q := NewQuery(v)
@@ -314,11 +316,10 @@ func TestGetKeywordsWithDots(t *testing.T) {
 		[]rune("na"),
 		[]rune(`me\`),
 	}, q.GetKeywords())
-
 }
 
 func TestGetLastKeyword(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
@@ -338,27 +339,27 @@ func TestGetLastKeyword(t *testing.T) {
 }
 
 func TestStringGetLastKeyword(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
-	assert.Equal(q.StringGetLastKeyword(), "name")
+	assert.Equal("name", q.StringGetLastKeyword())
 
 	v = []rune(".test.")
 	q = NewQuery(v)
-	assert.Equal(q.StringGetLastKeyword(), "")
+	assert.Equal("", q.StringGetLastKeyword())
 
 	v = []rune(".test")
 	q = NewQuery(v)
-	assert.Equal(q.StringGetLastKeyword(), "test")
+	assert.Equal("test", q.StringGetLastKeyword())
 
 	v = []rune("")
 	q = NewQuery(v)
-	assert.Equal(q.StringGetLastKeyword(), "")
+	assert.Equal("", q.StringGetLastKeyword())
 }
 
 func TestPopKeyword(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
@@ -416,77 +417,77 @@ func TestPopKeyword(t *testing.T) {
 }
 
 func TestQueryStringGet(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test")
 	q := NewQuery(v)
 
-	assert.Equal(q.StringGet(), ".test")
+	assert.Equal(".test", q.StringGet())
 }
 
 func TestQueryStringSet(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".hello")
 	q := NewQuery(v)
 
-	assert.Equal(q.StringSet(".world"), ".world")
+	assert.Equal(".world", q.StringSet(".world"))
 }
 
 func TestQueryStringAdd(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".hello")
 	q := NewQuery(v)
 
-	assert.Equal(q.StringAdd("world"), ".helloworld")
+	assert.Equal(".helloworld", q.StringAdd("world"))
 }
 
 func TestStringGetKeywords(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
-	assert.Equal(q.StringGetKeywords(), []string{
+	assert.Equal([]string{
 		"test",
 		"name",
-	})
+	}, q.StringGetKeywords())
 
 	v = []rune(".test.name")
 	q = NewQuery(v)
-	assert.Equal(q.StringGetKeywords(), []string{
+	assert.Equal([]string{
 		"test",
 		"name",
-	})
+	}, q.StringGetKeywords())
 
 	v = []rune("")
 	q = NewQuery(v)
 	kws := q.StringGetKeywords()
 	assert.Equal([]string(nil), kws)
-	assert.Equal(0, len(kws))
+	assert.Empty(kws)
 }
 
 func TestStringPopKeyword(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 
 	v := []rune(".test.name")
 	q := NewQuery(v)
 	k, query := q.StringPopKeyword()
-	assert.Equal(k, "name")
+	assert.Equal("name", k)
 	assert.Equal(query, []rune(".test"))
 	assert.Equal(q.Get(), []rune(".test"))
 
 	v = []rune(".test.name.")
 	q = NewQuery(v)
 	k, query = q.StringPopKeyword()
-	assert.Equal(k, "")
+	assert.Equal("", k)
 	assert.Equal(query, []rune(".test.name"))
 	assert.Equal(q.Get(), []rune(".test.name"))
 
 	v = []rune(".test.name[23]")
 	q = NewQuery(v)
 	k, query = q.StringPopKeyword()
-	assert.Equal(k, "[23]")
+	assert.Equal("[23]", k)
 	assert.Equal(query, []rune(".test.name"))
 	assert.Equal(q.Get(), []rune(".test.name"))
 }

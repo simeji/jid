@@ -49,6 +49,7 @@ func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	e := &Engine{
 		manager:       j,
 		term:          NewTerminal(FilterPrompt, DefaultY, ea.Monochrome),
@@ -63,6 +64,7 @@ func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 		prettyResult:  ea.PrettyResult,
 	}
 	e.queryCursorIdx = e.query.Length()
+
 	return e, nil
 }
 
@@ -79,6 +81,7 @@ func (er *EngineResult) GetQueryString() string {
 func (er *EngineResult) GetContent() string {
 	return er.content
 }
+
 func (er *EngineResult) GetError() error {
 	return er.err
 }
@@ -88,7 +91,6 @@ func (e *Engine) GetQuery() QueryInterface {
 }
 
 func (e *Engine) Run() EngineResultInterface {
-
 	err := termbox.Init()
 	if err != nil {
 		panic(err)
@@ -98,7 +100,6 @@ func (e *Engine) Run() EngineResultInterface {
 	var contents []string
 
 	for {
-
 		if e.query.StringGet() == "" {
 			e.query.StringSet(".")
 			e.queryCursorIdx = e.query.Length()
@@ -107,6 +108,7 @@ func (e *Engine) Run() EngineResultInterface {
 		bl := len(contents)
 		contents = e.getContents()
 		e.setCandidateData()
+
 		e.queryConfirm = false
 		if bl != len(contents) {
 			e.contentOffset = 0
@@ -121,6 +123,7 @@ func (e *Engine) Run() EngineResultInterface {
 			Candidates:      e.candidates,
 			CursorOffset:    e.query.IndexOffset(e.queryCursorIdx),
 		}
+
 		err = e.term.Draw(ta)
 		if err != nil {
 			panic(err)
@@ -168,6 +171,7 @@ func (e *Engine) Run() EngineResultInterface {
 			case termbox.KeyEnter:
 				if !e.candidatemode {
 					var cc string
+
 					var err error
 					if e.prettyResult {
 						cc, _, _, err = e.manager.GetPretty(e.query, true)
@@ -181,6 +185,7 @@ func (e *Engine) Run() EngineResultInterface {
 						err:     err,
 					}
 				}
+
 				e.confirmCandidate()
 			case termbox.KeyCtrlC:
 				return &EngineResult{}
@@ -188,7 +193,7 @@ func (e *Engine) Run() EngineResultInterface {
 			}
 		case termbox.EventError:
 			panic(ev.Err)
-			break
+
 		default:
 		}
 	}
@@ -196,13 +201,16 @@ func (e *Engine) Run() EngineResultInterface {
 
 func (e *Engine) getContents() []string {
 	var c string
+
 	var contents []string
+
 	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
 	if e.keymode {
 		contents = e.candidates
 	} else {
 		contents = strings.Split(c, "\n")
 	}
+
 	return contents
 }
 
@@ -214,6 +222,7 @@ func (e *Engine) setCandidateData() {
 	} else {
 		e.candidatemode = false
 	}
+
 	if !e.candidatemode {
 		e.candidateidx = 0
 		e.candidates = []string{}
@@ -233,7 +242,6 @@ func (e *Engine) deleteChar() {
 		_ = e.query.Delete(i)
 		e.queryCursorIdx--
 	}
-
 }
 
 func (e *Engine) deleteLineQuery() {
@@ -259,11 +267,12 @@ func (e *Engine) scrollToTop() {
 	e.contentOffset = 0
 }
 
-func (e *Engine) scrollPageDown(rownum int, height int) {
+func (e *Engine) scrollPageDown(rownum, height int) {
 	co := rownum - 1
 	if o := rownum - e.contentOffset; o > height {
 		co = e.contentOffset + (height - DefaultY)
 	}
+
 	e.contentOffset = co
 }
 
@@ -272,18 +281,22 @@ func (e *Engine) scrollPageUp(height int) {
 	if o := e.contentOffset - (height - DefaultY); o > 0 {
 		co = o
 	}
+
 	e.contentOffset = co
 }
 
 func (e *Engine) toggleKeymode() {
 	e.keymode = !e.keymode
 }
+
 func (e *Engine) deleteWordBackward() {
 	if k, _ := e.query.StringPopKeyword(); k != "" && !strings.Contains(k, "[") {
 		_ = e.query.StringAdd(".")
 	}
+
 	e.queryCursorIdx = e.query.Length()
 }
+
 func (e *Engine) tabAction() {
 	if !e.candidatemode {
 		e.candidatemode = true
@@ -291,6 +304,7 @@ func (e *Engine) tabAction() {
 			if k, _ := e.query.StringPopKeyword(); !strings.Contains(k, "[") {
 				_ = e.query.StringAdd(".")
 			}
+
 			_ = e.query.StringAdd(e.complete[1])
 		} else {
 			_ = e.query.StringAdd(e.complete[0])
@@ -298,11 +312,14 @@ func (e *Engine) tabAction() {
 	} else {
 		e.candidateidx = e.candidateidx + 1
 	}
+
 	e.queryCursorIdx = e.query.Length()
 }
+
 func (e *Engine) escapeCandidateMode() {
 	e.candidatemode = false
 }
+
 func (e *Engine) inputChar(ch rune) {
 	_ = e.query.Insert([]rune{ch}, e.queryCursorIdx)
 	e.queryCursorIdx++
@@ -322,11 +339,14 @@ func (e *Engine) moveCursorForward() {
 
 func (e *Engine) moveCursorWordBackwark() {
 }
+
 func (e *Engine) moveCursorWordForward() {
 }
+
 func (e *Engine) moveCursorToTop() {
 	e.queryCursorIdx = 0
 }
+
 func (e *Engine) moveCursorToEnd() {
 	e.queryCursorIdx = e.query.Length()
 }

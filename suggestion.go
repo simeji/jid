@@ -24,8 +24,7 @@ const (
 	BOOL
 )
 
-type Suggestion struct {
-}
+type Suggestion struct{}
 
 func NewSuggestion() *Suggestion {
 	return &Suggestion{}
@@ -33,6 +32,7 @@ func NewSuggestion() *Suggestion {
 
 func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 	var completion string
+
 	var suggestion string
 
 	if a, err := json.Array(); err == nil {
@@ -43,8 +43,10 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 			} else if kw == "[" {
 				return []string{"", "["}
 			}
+
 			return []string{strings.Replace(kw+"]", kw, "", -1), kw + "]"}
 		}
+
 		return []string{strings.Replace(`[0]`, keyword, "", -1), `[0]`}
 	}
 
@@ -67,23 +69,31 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 			if len(suggestion) > len(key) {
 				axis = key
 			}
+
 			max := 0
-			for i, _ := range axis {
+
+			for i := range axis {
 				if suggestion[i] != key[i] {
 					break
 				}
+
 				max = i
 			}
+
 			if max == 0 {
 				suggestion = ""
+
 				break
 			}
+
 			suggestion = suggestion[0 : max+1]
 		}
 	}
+
 	if reg, err := regexp.Compile("(?i)^" + keyword); err == nil {
 		completion = reg.ReplaceAllString(suggestion, "")
 	}
+
 	return []string{completion, suggestion}
 }
 
@@ -102,39 +112,45 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 	if err != nil {
 		return []string{}
 	}
+
 	for _, key := range getCurrentKeys(json) {
 		if reg.MatchString(key) {
 			candidates = append(candidates, key)
 		}
 	}
+
 	return candidates
 }
 
 func getCurrentKeys(json *simplejson.Json) []string {
-
 	kk := []string{}
 	m, err := json.Map()
-
 	if err != nil {
 		return kk
 	}
+
 	for k := range m {
 		kk = append(kk, k)
 	}
+
 	sort.Strings(kk)
 
 	keys := []string{}
+
 	for _, k := range kk {
 		if strings.Contains(k, ".") {
 			var sb strings.Builder
+
 			sb.Grow(len(k) + 4)
 			sb.WriteString(`\"`)
 			sb.WriteString(k)
 			sb.WriteString(`\"`)
 			k = sb.String()
 		}
+
 		keys = append(keys, k)
 	}
+
 	return keys
 }
 
@@ -146,5 +162,6 @@ func (s *Suggestion) GetCurrentType(json *simplejson.Json) SuggestionDataType {
 	} else if _, err = json.String(); err == nil {
 		return STRING
 	}
+
 	return UNKNOWN
 }

@@ -10,12 +10,12 @@ import (
 )
 
 func TestNewSuggestion(t *testing.T) {
-	var assert = assert.New(t)
-	assert.Equal(NewSuggestion(), &Suggestion{})
+	assert := assert.New(t)
+	assert.Equal(&Suggestion{}, NewSuggestion())
 }
 
 func TestSuggestionGet(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 	j := createJson(`{"name":"simeji-github"}`)
 	s := NewSuggestion()
 
@@ -48,7 +48,7 @@ func TestSuggestionGet(t *testing.T) {
 }
 
 func TestSuggestionGetCurrentType(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 	s := NewSuggestion()
 
 	j := createJson(`[1,2,3]`)
@@ -62,7 +62,7 @@ func TestSuggestionGetCurrentType(t *testing.T) {
 }
 
 func TestSuggestionGetCandidateKeys(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 	j := createJson(`{"naming":"simeji", "nickname":"simejisimeji", "city":"tokyo", "name":"simeji-github" }`)
 	s := NewSuggestion()
 
@@ -84,8 +84,9 @@ func TestSuggestionGetCandidateKeys(t *testing.T) {
 	s = NewSuggestion()
 	assert.Equal([]string{}, s.GetCandidateKeys(j, "["))
 }
+
 func TestSuggestionGetCandidateKeysWithDots(t *testing.T) {
-	var assert = assert.New(t)
+	assert := assert.New(t)
 	j := createJson(`{"nam.ing":"simeji", "nickname":"simejisimeji", "city":"tokyo", "name":"simeji-github" }`)
 	s := NewSuggestion()
 
@@ -97,5 +98,6 @@ func createJson(s string) *simplejson.Json {
 	r := bytes.NewBufferString(s)
 	buf, _ := io.ReadAll(r)
 	j, _ := simplejson.NewJson(buf)
+
 	return j
 }

@@ -1,12 +1,12 @@
 package jid
 
 import (
-	"github.com/bitly/go-simplejson"
-	"github.com/pkg/errors"
 	"io"
 	"regexp"
 	"strconv"
-	//"strings"
+
+	"github.com/bitly/go-simplejson"
+	"github.com/pkg/errors"
 )
 
 type JsonManager struct {
@@ -17,7 +17,6 @@ type JsonManager struct {
 
 func NewJsonManager(reader io.Reader) (*JsonManager, error) {
 	buf, err := io.ReadAll(reader)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid data")
 	}
@@ -51,10 +50,12 @@ func (jm *JsonManager) Get(q QueryInterface, confirm bool) (string, []string, []
 
 func (jm *JsonManager) GetPretty(q QueryInterface, confirm bool) (string, []string, []string, error) {
 	json, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
+
 	s, err := json.EncodePretty()
 	if err != nil {
 		return "", []string{"", ""}, []string{"", ""}, errors.Wrap(err, "failure json encode")
 	}
+
 	return string(s), suggestion, candidates, nil
 }
 
@@ -65,14 +66,17 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 	keywords := q.StringGetKeywords()
 
 	idx := 0
+
 	if l := len(keywords); l == 0 {
 		return json, []string{"", ""}, []string{}, nil
 	} else if l > 0 {
 		idx = l - 1
 	}
+
 	for _, keyword := range keywords[0:idx] {
 		json, _ = getItem(json, keyword)
 	}
+
 	reg := regexp.MustCompile(`\[[0-9]*$`)
 
 	suggest := jm.suggestion.Get(json, lastKeyword)
@@ -83,6 +87,7 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 		if j, exist := getItem(json, lastKeyword); exist && (confirm || candidateNum == 1) {
 			json = j
 			candidateKeys = []string{}
+
 			if _, err := json.Array(); err == nil {
 				suggest = jm.suggestion.Get(json, "")
 			} else {
@@ -93,6 +98,7 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 			suggest = jm.suggestion.Get(json, "")
 		}
 	}
+
 	return json, suggest, candidateKeys, nil
 }
 
@@ -102,6 +108,7 @@ func (jm *JsonManager) GetCandidateKeys(q QueryInterface) []string {
 
 func getItem(json *simplejson.Json, s string) (*simplejson.Json, bool) {
 	var result *simplejson.Json
+
 	var exist bool
 
 	re := regexp.MustCompile(`\[([0-9]+)\]`)
@@ -114,11 +121,13 @@ func getItem(json *simplejson.Json, s string) (*simplejson.Json, bool) {
 	// Query include [
 	if len(matches) > 0 {
 		index, _ := strconv.Atoi(matches[1])
+
 		if a, err := json.Array(); err != nil {
 			exist = false
 		} else if len(a) < index {
 			exist = false
 		}
+
 		result = json.GetIndex(index)
 	} else {
 		result, exist = json.CheckGet(s)
@@ -126,6 +135,7 @@ func getItem(json *simplejson.Json, s string) (*simplejson.Json, bool) {
 			result = &simplejson.Json{}
 		}
 	}
+
 	return result, exist
 }
 
