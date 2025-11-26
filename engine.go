@@ -166,22 +166,24 @@ func (e *Engine) Run() EngineResultInterface {
 			case termbox.KeyEsc:
 				e.escapeCandidateMode()
 			case termbox.KeyEnter:
-				if !e.candidatemode {
-					var cc string
-					var err error
-					if e.prettyResult {
-						cc, _, _, err = e.manager.GetPretty(e.query, true)
-					} else {
-						cc, _, _, err = e.manager.Get(e.query, true)
-					}
-
-					return &EngineResult{
-						content: cc,
-						qs:      e.query.StringGet(),
-						err:     err,
-					}
+				if e.candidatemode {
+					e.confirmCandidate()
 				}
-				e.confirmCandidate()
+			case termbox.KeyCtrlQ:
+				var cc string
+
+				var err error
+				if e.prettyResult {
+					cc, _, _, err = e.manager.GetPretty(e.query, true)
+				} else {
+					cc, _, _, err = e.manager.Get(e.query, true)
+				}
+
+				return &EngineResult{
+					content: cc,
+					qs:      e.query.StringGet(),
+					err:     err,
+				}
 			case termbox.KeyCtrlC:
 				return &EngineResult{}
 			default:
