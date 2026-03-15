@@ -22,6 +22,7 @@ func TestNewJson(t *testing.T) {
 	assert.Equal(jm, &JsonManager{
 		current:    sj,
 		origin:     sj,
+		originData: map[string]interface{}{"name": "go"},
 		suggestion: NewSuggestion(),
 	})
 	assert.Nil(e)
@@ -452,6 +453,45 @@ func TestGetCurrentKeys(t *testing.T) {
 
 	keys = getCurrentKeys(sj)
 	assert.Equal([]string{}, keys)
+}
+
+func TestGetFilteredDataJMESPath(t *testing.T) {
+	var assert = assert.New(t)
+
+	data := `{"users":[{"name":"alice","age":30},{"name":"bob","age":25}],"count":2}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// keys() function — order is not guaranteed by JMESPath
+	q := NewQueryWithString(". | keys(@)")
+	result, _, _, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Contains(string(d), `"count"`)
+	assert.Contains(string(d), `"users"`)
+
+	// length() function
+	q = NewQueryWithString(".users | length(@)")
+	result, _, _, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`2`, string(d))
+
+	// wildcard projection
+	q = NewQueryWithString(".users[*].name")
+	result, _, _, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`["alice","bob"]`, string(d))
+
+	// partial pipe (user still typing function name) — should show base result
+	q = NewQueryWithString(".users | len")
+	result, _, fnCandidates, _ := jm.GetFilteredData(q, false)
+	d, _ = result.Encode()
+	// should show users array (base expression result)
+	assert.Contains(string(d), "alice")
+	// function suggestions should include length(
+	assert.Contains(fnCandidates, "length(")
 }
 
 func TestIsEmptyJson(t *testing.T) {

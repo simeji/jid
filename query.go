@@ -246,16 +246,24 @@ func validate(r []rune) bool {
 	if regexp.MustCompile(`^[^.]`).MatchString(s) {
 		return false
 	}
+	// Allow JMESPath pipe expressions: `. | func()`
+	if regexp.MustCompile(`\|\s*\S`).MatchString(s) {
+		return true
+	}
+	// Allow JMESPath wildcards and filter expressions
+	if regexp.MustCompile(`\[\*\]|\[\?`).MatchString(s) {
+		return true
+	}
 	if regexp.MustCompile(`\.{2,}`).MatchString(s) {
 		return false
 	}
-	if regexp.MustCompile(`\[[0-9]*\][^\.\[]`).MatchString(s) {
+	if regexp.MustCompile(`\[[0-9]*\][^\.\[|]`).MatchString(s) {
 		return false
 	}
 	if regexp.MustCompile(`\[{2,}|\]{2,}`).MatchString(s) {
 		return false
 	}
-	if regexp.MustCompile(`.\.\[`).MatchString(s) {
+	if regexp.MustCompile(`[^|]\.\[`).MatchString(s) {
 		return false
 	}
 	return true

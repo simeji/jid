@@ -221,10 +221,28 @@ func (e *Engine) setCandidateData() {
 }
 
 func (e *Engine) confirmCandidate() {
-	_, _ = e.query.PopKeyword()
-	_ = e.query.StringAdd(".")
-	_ = e.query.StringAdd(e.candidates[e.candidateidx])
-	e.queryCursorIdx = e.query.Length()
+	selected := e.candidates[e.candidateidx]
+
+	// JMESPath function candidates end with "(". Insert them as a pipe expression
+	// so the user gets: <base> | funcname(@)
+	if strings.HasSuffix(selected, "(") {
+		funcName := strings.TrimSuffix(selected, "(")
+		// Strip any trailing " | <partial>" typed so far and replace cleanly.
+		qs := e.query.StringGet()
+		if idx := strings.LastIndex(qs, " | "); idx >= 0 {
+			_ = e.query.StringSet(qs[:idx])
+		}
+		_ = e.query.StringAdd(" | ")
+		_ = e.query.StringAdd(funcName)
+		_ = e.query.StringAdd("(@)")
+		// Position cursor just before the closing ")" so the user can refine args.
+		e.queryCursorIdx = e.query.Length() - 1
+	} else {
+		_, _ = e.query.PopKeyword()
+		_ = e.query.StringAdd(".")
+		_ = e.query.StringAdd(selected)
+		e.queryCursorIdx = e.query.Length()
+	}
 	e.queryConfirm = true
 }
 
@@ -288,10 +306,18 @@ func (e *Engine) tabAction() {
 	if !e.candidatemode {
 		e.candidatemode = true
 		if e.complete[0] != e.complete[1] && e.complete[0] != "" {
-			if k, _ := e.query.StringPopKeyword(); !strings.Contains(k, "[") {
-				_ = e.query.StringAdd(".")
+			suggestion := e.complete[1]
+			// Function completions (end with "(") are already handled via
+			// confirmCandidate; for tab-inline completion just append the
+			// remaining characters without adding a leading dot.
+			if strings.HasSuffix(suggestion, "(") {
+				_ = e.query.StringAdd(e.complete[0])
+			} else {
+				if k, _ := e.query.StringPopKeyword(); !strings.Contains(k, "[") {
+					_ = e.query.StringAdd(".")
+				}
+				_ = e.query.StringAdd(suggestion)
 			}
-			_ = e.query.StringAdd(e.complete[1])
 		} else {
 			_ = e.query.StringAdd(e.complete[0])
 		}

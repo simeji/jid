@@ -11,6 +11,19 @@ import (
 type SuggestionInterface interface {
 	Get(json *simplejson.Json, keyword string) []string
 	GetCandidateKeys(json *simplejson.Json, keyword string) []string
+	GetFunctionCandidates(prefix string) []string
+	GetFunctionSuggestion(prefix string) []string
+}
+
+// jmespathFunctions is the full list of JMESPath built-in functions.
+// Each entry is the function name without the trailing "(" so it can be
+// used both for completion and for the candidate list.
+var jmespathFunctions = []string{
+	"abs", "avg", "ceil", "contains", "ends_with", "floor",
+	"join", "keys", "length", "map", "max", "max_by",
+	"merge", "min", "min_by", "not_null", "reverse",
+	"sort", "sort_by", "starts_with", "sum",
+	"to_array", "to_number", "to_string", "type", "values",
 }
 
 type SuggestionDataType int
@@ -136,6 +149,71 @@ func getCurrentKeys(json *simplejson.Json) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// GetFunctionCandidates returns JMESPath function names (with trailing "(")
+// that match the given prefix (case-insensitive).
+func (s *Suggestion) GetFunctionCandidates(prefix string) []string {
+	if prefix == "" {
+		out := make([]string, len(jmespathFunctions))
+		for i, fn := range jmespathFunctions {
+			out[i] = fn + "("
+		}
+		return out
+	}
+	reg, err := regexp.Compile(`(?i)^` + regexp.QuoteMeta(prefix))
+	if err != nil {
+		return []string{}
+	}
+	var out []string
+	for _, fn := range jmespathFunctions {
+		if reg.MatchString(fn) {
+			out = append(out, fn+"(")
+		}
+	}
+	return out
+}
+
+// GetFunctionSuggestion returns [completion, suggestion] for function-name
+// autocompletion, mirroring the return format of Get().
+func (s *Suggestion) GetFunctionSuggestion(prefix string) []string {
+	candidates := s.GetFunctionCandidates(prefix)
+	if len(candidates) == 0 {
+		return []string{"", ""}
+	}
+	// Find longest common prefix among candidates (strip trailing "(" for calc).
+	suggestion := candidates[0]
+	for _, c := range candidates[1:] {
+		// work on names without "("
+		a := strings.TrimSuffix(suggestion, "(")
+		b := strings.TrimSuffix(c, "(")
+		axis := a
+		if len(b) < len(a) {
+			axis = b
+		}
+		max := 0
+		for i := range axis {
+			if i >= len(a) || i >= len(b) || a[i] != b[i] {
+				break
+			}
+			max = i
+		}
+		if max == 0 && (len(axis) == 0 || a[0] != b[0]) {
+			suggestion = ""
+			break
+		}
+		suggestion = a[:max+1] + "("
+	}
+	if suggestion == "" {
+		return []string{"", ""}
+	}
+	// completion is the remaining characters after what has been typed
+	reg, err := regexp.Compile(`(?i)^` + regexp.QuoteMeta(prefix))
+	if err != nil {
+		return []string{"", ""}
+	}
+	completion := reg.ReplaceAllString(suggestion, "")
+	return []string{completion, suggestion}
 }
 
 func (s *Suggestion) GetCurrentType(json *simplejson.Json) SuggestionDataType {
