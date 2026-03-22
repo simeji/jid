@@ -20,13 +20,16 @@ type Terminal struct {
 }
 
 type TerminalDrawAttributes struct {
-	Query           string
-	Contents        []string
-	CandidateIndex  int
-	ContentsOffsetY int
-	Complete        string
-	Candidates      []string
-	CursorOffset    int
+	Query            string
+	Contents         []string
+	CandidateIndex   int
+	ContentsOffsetY  int
+	Complete         string
+	Candidates       []string
+	CursorOffset     int
+	FuncHelp         string
+	PlaceholderStart int // rune index in Query; -1 if no placeholder
+	PlaceholderLen   int
 }
 
 func NewTerminal(prompt string, defaultY int, monochrome bool) *Terminal {
@@ -57,10 +60,18 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 	y := t.defaultY
 	_, h := termbox.Size()
 
-	t.drawFilterLine(query, complete)
+	t.drawFilterLine(query, complete, attr.PlaceholderStart, attr.PlaceholderLen)
 
 	if len(candidates) > 0 {
 		y = t.drawCandidates(0, t.defaultY, candidateidx, candidates)
+	}
+	if attr.FuncHelp != "" {
+		col := 0
+		for _, ch := range attr.FuncHelp {
+			termbox.SetCell(col, y, ch, termbox.ColorYellow|termbox.AttrBold, termbox.ColorDefault)
+			col++
+		}
+		y++
 	}
 
 	cellsArr, err := t.rowsToCells(rows)
@@ -84,13 +95,22 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 	return nil
 }
 
-func (t *Terminal) drawFilterLine(qs string, complete string) error {
+func (t *Terminal) drawFilterLine(qs string, complete string, phStart int, phLen int) error {
 	fs := t.prompt + qs
 	cs := complete
 	str := fs + cs
 
 	color := termbox.ColorDefault
 	backgroundColor := termbox.ColorDefault
+
+	// Compute byte offsets of placeholder range in str (prompt + query are ASCII)
+	promptBytes := len(t.prompt)
+	phByteStart := -1
+	phByteEnd := -1
+	if phStart >= 0 && phLen > 0 {
+		phByteStart = promptBytes + phStart
+		phByteEnd = phByteStart + phLen
+	}
 
 	var cells []termbox.Cell
 	match := []int{len(fs), len(fs + cs)}
@@ -100,6 +120,9 @@ func (t *Terminal) drawFilterLine(qs string, complete string) error {
 		c = color
 		if i >= match[0] && i < match[1] {
 			c = termbox.ColorGreen
+		}
+		if phByteStart >= 0 && i >= phByteStart && i < phByteEnd {
+			c = termbox.ColorBlue
 		}
 		cells = append(cells, termbox.Cell{
 			Ch: s,
@@ -227,6 +250,20 @@ func (t *Terminal) drawCells(x int, y int, cells []termbox.Cell) {
 			w = 1
 		}
 
+		i += w
+	}
+}
+
+func (t *Terminal) drawFuncHelp(x int, y int, help string) {
+	fg := termbox.ColorYellow
+	bg := termbox.ColorDefault
+	i := 0
+	for _, ch := range help {
+		termbox.SetCell(x+i, y, ch, fg, bg)
+		w := runewidth.RuneWidth(ch)
+		if w == 0 || w == 2 && runewidth.IsAmbiguousWidth(ch) {
+			w = 1
+		}
 		i += w
 	}
 }

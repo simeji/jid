@@ -4,8 +4,9 @@ go 1.20
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/mattn/go-runewidth v0.0.4
-	github.com/nsf/termbox-go v0.0.0-20181027232701-60ab7e3d12ed
+	github.com/jmespath/go-jmespath v0.4.0
+	github.com/mattn/go-runewidth v0.0.9
+	github.com/nsf/termbox-go v1.1.1
 	github.com/nwidger/jsoncolor v0.0.0-20170215171346-75a6de4340e5
 	github.com/pkg/errors v0.8.0
 	github.com/stretchr/testify v1.8.1

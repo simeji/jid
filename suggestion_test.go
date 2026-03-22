@@ -93,6 +93,108 @@ func TestSuggestionGetCandidateKeysWithDots(t *testing.T) {
 	assert.Equal([]string{`\"nam.ing\"`, "name", "nickname"}, s.GetCandidateKeys(j, "n"))
 }
 
+func TestGetFunctionCandidates(t *testing.T) {
+	var assert = assert.New(t)
+	s := NewSuggestion()
+
+	// empty prefix returns all built-in functions with trailing "("
+	all := s.GetFunctionCandidates("")
+	assert.Equal(len(jmespathFunctions), len(all))
+	assert.Contains(all, "length(")
+	assert.Contains(all, "sort_by(")
+
+	// prefix filter (case-insensitive)
+	assert.Equal([]string{"length("}, s.GetFunctionCandidates("le"))
+	assert.Equal([]string{"sort(", "sort_by("}, s.GetFunctionCandidates("so"))
+	assert.Nil(s.GetFunctionCandidates("zzz"))
+}
+
+func TestGetFunctionCandidatesFiltered(t *testing.T) {
+	var assert = assert.New(t)
+	s := NewSuggestion()
+
+	// UNKNOWN shows everything
+	all := s.GetFunctionCandidatesFiltered("", UNKNOWN)
+	assert.Equal(len(jmespathFunctions), len(all))
+
+	// ARRAY: array-compatible only
+	arr := s.GetFunctionCandidatesFiltered("", ARRAY)
+	assert.Contains(arr, "length(")
+	assert.Contains(arr, "sort(")
+	assert.Contains(arr, "avg(")
+	assert.NotContains(arr, "abs(")   // NUMBER-only
+	assert.NotContains(arr, "keys(")  // MAP-only
+
+	// MAP: map-compatible only
+	mp := s.GetFunctionCandidatesFiltered("", MAP)
+	assert.Contains(mp, "keys(")
+	assert.Contains(mp, "values(")
+	assert.NotContains(mp, "avg(")    // ARRAY-only
+
+	// STRING: string-compatible only
+	str := s.GetFunctionCandidatesFiltered("", STRING)
+	assert.Contains(str, "contains(")
+	assert.Contains(str, "starts_with(")
+	assert.NotContains(str, "sum(")   // ARRAY-only
+
+	// NUMBER: number-compatible only
+	num := s.GetFunctionCandidatesFiltered("", NUMBER)
+	assert.Contains(num, "abs(")
+	assert.Contains(num, "ceil(")
+	assert.NotContains(num, "keys(")  // MAP-only
+
+	// prefix + type filter
+	assert.Equal([]string{"sort(", "sort_by("}, s.GetFunctionCandidatesFiltered("so", ARRAY))
+	assert.Empty(s.GetFunctionCandidatesFiltered("so", MAP)) // sort/sort_by not in MAP
+}
+
+func TestGetFunctionSuggestion(t *testing.T) {
+	var assert = assert.New(t)
+	s := NewSuggestion()
+
+	// unique prefix → full suggestion
+	assert.Equal([]string{"ngth(", "length("}, s.GetFunctionSuggestion("le"))
+
+	// common prefix of multiple candidates ("sort" and "sort_by" share "sort")
+	assert.Equal([]string{"rt(", "sort("}, s.GetFunctionSuggestion("so"))
+
+	// no match
+	assert.Equal([]string{"", ""}, s.GetFunctionSuggestion("zzz"))
+}
+
+func TestFunctionDescription(t *testing.T) {
+	var assert = assert.New(t)
+
+	assert.NotEmpty(FunctionDescription("length("))
+	assert.NotEmpty(FunctionDescription("length")) // without trailing "("
+	assert.Empty(FunctionDescription("nonexistent"))
+}
+
+func TestFunctionTemplate(t *testing.T) {
+	var assert = assert.New(t)
+
+	args, cursorBack, phLen := FunctionTemplate("abs(")
+	assert.Equal("@", args)
+	assert.Equal(0, cursorBack)
+	assert.Equal(0, phLen)
+
+	args, cursorBack, phLen = FunctionTemplate("contains(")
+	assert.Equal("@, ''", args)
+	assert.Equal(2, cursorBack)
+	assert.Equal(0, phLen)
+
+	args, cursorBack, phLen = FunctionTemplate("sort_by(")
+	assert.Equal("@, &field", args)
+	assert.Equal(6, cursorBack)
+	assert.Equal(5, phLen)
+
+	// unknown function falls back to "@"
+	args, cursorBack, phLen = FunctionTemplate("unknown(")
+	assert.Equal("@", args)
+	assert.Equal(0, cursorBack)
+	assert.Equal(0, phLen)
+}
+
 func createJson(s string) *simplejson.Json {
 	r := bytes.NewBufferString(s)
 	buf, _ := io.ReadAll(r)

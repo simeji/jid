@@ -1,6 +1,17 @@
 ChangeLog
 =======
 
+### 1.0.0 - Mar 23 2026
+
+Features:
+* JMESPath support (wildcard projections, pipe expressions, filter expressions, function calls)
+* Function candidates filtered by input type (array, object, string, number)
+* Function argument templates with placeholder text
+* Function description display (Ctrl+X to toggle)
+* Shift+Tab to cycle candidates backward / decrement array index
+* Ctrl+W JMESPath-aware word deletion (segment-by-segment)
+* Transparent rewrite of `[*].field[N]` → `[*].field | [N]` for correct array indexing
+
 ### 0.7.2 - Jan 23 2017
 
 BugFix:

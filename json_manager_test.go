@@ -22,6 +22,7 @@ func TestNewJson(t *testing.T) {
 	assert.Equal(jm, &JsonManager{
 		current:    sj,
 		origin:     sj,
+		originData: map[string]interface{}{"name": "go"},
 		suggestion: NewSuggestion(),
 	})
 	assert.Nil(e)
@@ -452,6 +453,202 @@ func TestGetCurrentKeys(t *testing.T) {
 
 	keys = getCurrentKeys(sj)
 	assert.Equal([]string{}, keys)
+}
+
+func TestGetFilteredDataJMESPath(t *testing.T) {
+	var assert = assert.New(t)
+
+	data := `{"users":[{"name":"alice","age":30},{"name":"bob","age":25}],"count":2}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// keys() function — order is not guaranteed by JMESPath
+	q := NewQueryWithString(". | keys(@)")
+	result, _, _, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Contains(string(d), `"count"`)
+	assert.Contains(string(d), `"users"`)
+
+	// length() function
+	q = NewQueryWithString(".users | length(@)")
+	result, _, _, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`2`, string(d))
+
+	// wildcard projection
+	q = NewQueryWithString(".users[*].name")
+	result, _, _, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`["alice","bob"]`, string(d))
+
+	// partial pipe (user still typing function name) — should show base result
+	q = NewQueryWithString(".users | len")
+	result, _, fnCandidates, _ := jm.GetFilteredData(q, false)
+	d, _ = result.Encode()
+	// should show users array (base expression result)
+	assert.Contains(string(d), "alice")
+	// function suggestions should include length(
+	assert.Contains(fnCandidates, "length(")
+}
+
+func TestGetFilteredDataJMESPathWildcard(t *testing.T) {
+	var assert = assert.New(t)
+
+	data := `{"users":[{"name":"alice","age":30},{"name":"bob","age":25}],"count":2}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// [*] projection → field candidates from first element
+	q := NewQueryWithString(".users[*]")
+	result, _, candidates, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Contains(string(d), "alice")
+	assert.Contains(candidates, "age")
+	assert.Contains(candidates, "name")
+
+	// [*].fieldname (complete field) → array result, no field candidates
+	q = NewQueryWithString(".users[*].name")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`["alice","bob"]`, string(d))
+	assert.Empty(candidates)
+
+	// trailing dot after [*] → still shows wildcard result + field candidates
+	q = NewQueryWithString(".users[*].")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Contains(string(d), "alice")
+	assert.Contains(candidates, "age")
+	assert.Contains(candidates, "name")
+
+	// partial field after [*] matching some fields → field candidates filtered
+	q = NewQueryWithString(".users[*].n")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Contains(string(d), "alice") // shows base wildcard result
+	assert.Equal([]string{"name"}, candidates)
+
+	// partial field that matches nothing → fall through to actual result (not wildcard base)
+	q = NewQueryWithString(".users[*].zzz")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`[]`, string(d)) // actual JMESPath result, not the wildcard base
+	assert.Empty(candidates)
+
+	// [*].field[N] → auto pipe rewrite: treat as "[*].field | [N]"
+	// (JMESPath [N] within a projection applies to each element, not the array)
+	q = NewQueryWithString(".users[*].name[0]")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`"alice"`, string(d)) // first projected name, not []
+	assert.Empty(candidates)
+
+	// [*].objects[N] → auto pipe rewrite → object result with field candidates
+	q = NewQueryWithString(".users[*][0]")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Contains(string(d), `"alice"`) // first user object
+	assert.Contains(candidates, "name")
+	assert.Contains(candidates, "age")
+
+	// [*].field[N].subfield → chained rewrite via pipe: "[*].field | [N].subfield"
+	q = NewQueryWithString(".users[*].name[0]")
+	result, _, _, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Equal(`"alice"`, string(d))
+
+	// [*].field[N] | func(@) → evalBaseExpr rewrite enables pipe chaining
+	q = NewQueryWithString(".users[*][0] | keys(@)")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Contains(string(d), `"age"`)
+	assert.Contains(string(d), `"name"`)
+	assert.Empty(candidates)
+
+	// [*].field[N]| (pipe after index, function typing mode) → base shows rewritten result
+	q = NewQueryWithString(".users[*][0] | ")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Contains(string(d), `"alice"`) // base = first user object (not [])
+	assert.Contains(candidates, "keys(")  // MAP-type candidates
+	assert.NotContains(candidates, "avg(") // not ARRAY-type
+}
+
+func TestGetFilteredDataJMESPathTypeFilter(t *testing.T) {
+	var assert = assert.New(t)
+
+	data := `{"items":[1,2,3],"info":{"key":"value"},"text":"hello"}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// pipe after array → ARRAY-typed function candidates only
+	q := NewQueryWithString(".items | ")
+	_, _, candidates, _ := jm.GetFilteredData(q, false)
+	assert.Contains(candidates, "length(")
+	assert.Contains(candidates, "sort(")
+	assert.NotContains(candidates, "keys(")  // MAP-only
+	assert.NotContains(candidates, "abs(")   // NUMBER-only
+
+	// pipe after map → MAP-typed function candidates only
+	q = NewQueryWithString(".info | ")
+	_, _, candidates, _ = jm.GetFilteredData(q, false)
+	assert.Contains(candidates, "keys(")
+	assert.Contains(candidates, "values(")
+	assert.NotContains(candidates, "avg(")  // ARRAY-only
+
+	// pipe after string → STRING-typed function candidates only
+	q = NewQueryWithString(".text | ")
+	_, _, candidates, _ = jm.GetFilteredData(q, false)
+	assert.Contains(candidates, "contains(")
+	assert.Contains(candidates, "starts_with(")
+	assert.NotContains(candidates, "sum(")  // ARRAY-only
+
+	// pipe with partial function name → filtered suggestions
+	q = NewQueryWithString(".items | so")
+	result, _, candidates, _ := jm.GetFilteredData(q, false)
+	d, _ := result.Encode()
+	assert.Contains(string(d), "1") // shows base (items array)
+	assert.Contains(candidates, "sort(")
+	assert.Contains(candidates, "sort_by(")
+}
+
+func TestGetFilteredDataJMESPathObjectResult(t *testing.T) {
+	var assert = assert.New(t)
+
+	data := `{"id":1,"title":"hello","tags":["a","b"]}`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// JMESPath expression that evaluates to an object → field candidates
+	q := NewQueryWithString(". | to_array(@)[0]")
+	result, _, candidates, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Contains(string(d), `"hello"`)
+	assert.Contains(candidates, "id")
+	assert.Contains(candidates, "title")
+	assert.Contains(candidates, "tags")
+
+	// result with trailing dot after pipe expression
+	q = NewQueryWithString(". | to_array(@)[0].")
+	result, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	d, _ = result.Encode()
+	assert.Contains(string(d), `"hello"`)
+	assert.Contains(candidates, "id")
 }
 
 func TestIsEmptyJson(t *testing.T) {
