@@ -24,7 +24,8 @@ _testmain.go
 *.prof
 *.swp
 *.test
-test.*
+test.out
+test.log
 
 # jid package
 jid
