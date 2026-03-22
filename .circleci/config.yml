@@ -4,6 +4,9 @@ jobs:
     docker:
       - image: cimg/go:1.22
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:GdKQCwd1f2HsJKRbKm/HBBV6OLVzAfzE1E07od2mRN4"
       - checkout
       - restore_cache:
           keys:
@@ -13,30 +16,8 @@ jobs:
           key: go-mod-v1-{{ checksum "go.sum" }}
           paths:
             - ~/go/pkg/mod
-  release:
-    docker:
-      - image: cimg/go:1.22
-    steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:GdKQCwd1f2HsJKRbKm/HBBV6OLVzAfzE1E07od2mRN4"
-      - checkout
-      - run:
-          name: build jid using goreleaser
-          command: curl -sfL https://goreleaser.com/static/run | bash
 workflows:
   version: 2.1
-  test_and_release:
+  test:
     jobs:
-      - test:
-          filters:
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
-      - release:
-          requires:
-            - test
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+      - test
