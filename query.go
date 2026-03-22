@@ -257,7 +257,7 @@ func validate(r []rune) bool {
 	if regexp.MustCompile(`\.{2,}`).MatchString(s) {
 		return false
 	}
-	if regexp.MustCompile(`\[[0-9]*\][^\.\[|]`).MatchString(s) {
+	if regexp.MustCompile(`\[[0-9]*\][^\.\[| ]`).MatchString(s) {
 		return false
 	}
 	if regexp.MustCompile(`\[{2,}|\]{2,}`).MatchString(s) {

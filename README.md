@@ -4,10 +4,10 @@
 
 Json Incremental Digger
 
-It's a very simple tool.  
+It's a very simple tool.
 You can drill down JSON interactively by using filtering queries like [jq](https://stedolan.github.io/jq/).
 
-**Suggestion** and **Auto completion** of this tool will provide you a very comfortable JSON drill down.
+**Suggestion**, **Auto completion**, and **JMESPath** support provide a comfortable JSON exploration experience.
 
 ## Demo
 
@@ -15,13 +15,13 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ## Installation
 
-* [With HomeBrew (for macOS)](#with-homebrew-for-macos)  
-* [With MacPorts (for macOS)](#with-macports-for-macos)  
+* [With HomeBrew (for macOS)](#with-homebrew-for-macos)
+* [With MacPorts (for macOS)](#with-macports-for-macos)
 * [With pkg (for FreeBSD)](#with-pkg-for-freebsd)
 * [With scoop (for Windows)](#with-scoop-for-windows)
 * [Other package management system](#other-package-management-systems)
-* [Simply use "jid" command](#simply-use-jid-command)  
-* [Build](#build)  
+* [Simply use "jid" command](#simply-use-jid-command)
+* [Build](#build)
 
 ### With HomeBrew (for macOS)
 
@@ -70,10 +70,10 @@ go install github.com/simeji/jid/cmd/jid@latest
 
 ### Quick start
 
-* [simple json example](#simple-json-example)  
-* [simple json example2](#simple-json-example2)  
-* [with initial query](#with-initial-query)  
-* [with curl](#with-curl)  
+* [simple json example](#simple-json-example)
+* [simple json example2](#simple-json-example2)
+* [with initial query](#with-initial-query)
+* [with curl](#with-curl)
 
 #### simple json example
 
@@ -131,9 +131,11 @@ jid < file.json
 
 |key|description|
 |:-----------|:----------|
-|`TAB` / `CTRL` + `I` |Show available items and choice them|
-|`CTRL` + `W` |Delete from the cursor to the start of the word|
+|`TAB` / `CTRL` + `I` |Show available items and choose them (cycles forward)|
+|`Shift` + `TAB` |Cycle candidates backward / decrement array index|
+|`CTRL` + `W` |Delete one JMESPath segment backward (e.g. `.id` → `[0]` → `func(@)` → pipe)|
 |`CTRL` + `U` |Delete whole query|
+|`CTRL` + `X` |Toggle function description display (visible when function candidates are shown)|
 |`CTRL` + `F` / Right Arrow (:arrow_right:)|Move cursor a character to the right|
 |`CTRL` + `B` / Left Arrow (:arrow_left:)|Move cursor a character to the left|
 |`CTRL` + `A`|To the first character of the 'Filter'|
@@ -157,3 +159,100 @@ jid < file.json
 |-version | print the version and exit|
 |-q | Output query mode (for jq)|
 |-M | monochrome output mode|
+
+## JMESPath Support
+
+jid supports [JMESPath](https://jmespath.org/) expressions in addition to the traditional dot-path notation.
+JMESPath mode is automatically activated when the query contains pipe (`|`), wildcards (`[*]`), filter expressions (`[?`), or function calls.
+
+### JMESPath Query Examples
+
+```
+.                          traditional: show root JSON
+.users                     traditional: navigate to users field
+.users[0].name             traditional: array index + field access
+
+.users[*].name             wildcard projection: extract name from every user
+.users[*].address.city     nested wildcard projection
+.users[*].<Tab>            show field candidates from array elements
+
+. | keys(@)                pipe: list root object keys
+.users | length(@)         pipe: count users array
+.users | sort_by(@, &name) pipe: sort users by name field
+.users | reverse(@)        pipe: reverse the array
+
+.[1] | to_array(@)[0].id   chained pipe with indexing
+. | to_array(@)[0]         wrap root in array and index
+
+.users[*].name | [0]       project names then index
+```
+
+### Wildcard Projection + Array Index
+
+After a wildcard projection like `.game_indices[*].version`, the result is an array.
+Use `[N]` to navigate into it — jid automatically rewrites to pipe form internally:
+
+```
+.game_indices[*]           → field candidates: game_index, version
+.game_indices[*].version   → shows array of version objects; suggests [
+.game_indices[*].version[0]           → first version object {name, url}
+.game_indices[*].version[0].name      → first version's name
+.game_indices[*].version[0] | keys(@) → keys of first version object
+.game_indices[*].version[0] | keys(@) | sort(@)  → sorted keys
+```
+
+> **Note**: In standard JMESPath, `[*].field[0]` applies `[0]` to each projected
+> element rather than the projected array, producing `[]`. jid detects this pattern
+> and transparently rewrites it to `[*].field | [0]` so `[0]` indexes the array.
+
+### Function Candidates
+
+When you type `|` after a field, jid shows available JMESPath functions filtered by the type of the preceding expression:
+
+| Input type | Suggested functions |
+|:-----------|:-------------------|
+| Array | `avg`, `contains`, `join`, `length`, `map`, `max`, `max_by`, `min`, `min_by`, `not_null`, `reverse`, `sort`, `sort_by`, `sum`, `to_array`, `to_string`, `type` |
+| Object | `keys`, `length`, `merge`, `not_null`, `to_array`, `to_string`, `type`, `values` |
+| String | `contains`, `ends_with`, `length`, `not_null`, `reverse`, `starts_with`, `to_array`, `to_number`, `to_string`, `type` |
+| Number | `abs`, `ceil`, `floor`, `not_null`, `to_array`, `to_string`, `type` |
+
+A usage description is shown below the candidate list (toggle with `Ctrl+X`).
+
+### Function Argument Templates
+
+When a function candidate is confirmed, the arguments are automatically filled in and the cursor is placed at the right position:
+
+| Function | Inserted as | Cursor position |
+|:---------|:-----------|:----------------|
+| `contains` | `contains(@, '')` | inside `''` |
+| `ends_with` | `ends_with(@, '')` | inside `''` |
+| `starts_with` | `starts_with(@, '')` | inside `''` |
+| `join` | `join('', @)` | inside `''` (separator) |
+| `sort_by` | `sort_by(@, &field)` | on `field` placeholder |
+| `max_by` | `max_by(@, &field)` | on `field` placeholder |
+| `map` | `map(&expr, @)` | on `expr` placeholder |
+
+Placeholder text is shown in blue. Typing any character replaces the entire placeholder.
+
+### Wildcard Projection Navigation
+
+After a wildcard expression like `.game_indices[*]`, jid shows the field names of the array elements as candidates:
+
+```
+.game_indices[*]           → candidates: game_index, version
+.game_indices[*].<Tab>     → same candidates (trailing dot still shows fields)
+.game_indices[*].v<Tab>    → filtered: version
+.game_indices[*].version   → shows array result; suggests [ for index navigation
+.game_indices[*].version[0] → first version object; candidates: name, url
+```
+
+### Ctrl+W in JMESPath Mode
+
+`Ctrl+W` removes one segment at a time from the end of a JMESPath expression:
+
+```
+.[3] | to_array(@)[0].id  →(Ctrl+W)→  .[3] | to_array(@)[0]
+.[3] | to_array(@)[0]     →(Ctrl+W)→  .[3] | to_array(@)
+.[3] | to_array(@)        →(Ctrl+W)→  .[3] |
+.[3] |                    →(Ctrl+W)→  .[3]
+```

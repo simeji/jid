@@ -289,12 +289,12 @@ func TestTabAction(t *testing.T) {
 	_, e.complete, _, _ = e.manager.GetPretty(e.query, true)
 	e.candidatemode = false
 	e.tabAction()
-	assert.Equal(".NameTest[", e.query.StringGet())
+	assert.Equal(".NameTest[0]", e.query.StringGet())
 
 	_, e.complete, _, _ = e.manager.GetPretty(e.query, true)
 	e.candidatemode = false
 	e.tabAction()
-	assert.Equal(".NameTest[", e.query.StringGet())
+	assert.Equal(".NameTest[1]", e.query.StringGet())
 }
 
 func TestEscAction(t *testing.T) {
@@ -358,6 +358,125 @@ func TestMoveCursorToTopAndEnd(t *testing.T) {
 
 	e.moveCursorToEnd()
 	assert.Equal(3, e.queryCursorIdx)
+}
+
+func TestRemoveLastJMESPathSegment(t *testing.T) {
+	var assert = assert.New(t)
+
+	assert.Equal("", removeLastJMESPathSegment(""))
+	assert.Equal("to_array(@)[0]", removeLastJMESPathSegment("to_array(@)[0].id"))
+	assert.Equal("to_array(@)", removeLastJMESPathSegment("to_array(@)[0]"))
+	assert.Equal("", removeLastJMESPathSegment("to_array(@)"))
+	assert.Equal("foo", removeLastJMESPathSegment("foo.bar"))
+	assert.Equal("", removeLastJMESPathSegment("foo"))
+	assert.Equal("foo", removeLastJMESPathSegment("foo[0]"))
+	assert.Equal("foo.bar[1]", removeLastJMESPathSegment("foo.bar[1].baz"))
+	// dots inside parens are not treated as separators
+	assert.Equal("", removeLastJMESPathSegment("sort_by(@, &name)"))
+}
+
+func TestDeleteWordBackwardJMESPath(t *testing.T) {
+	var assert = assert.New(t)
+	e := getEngine(`[{"id":1,"title":"hello"},{"id":2,"title":"world"}]`, "")
+
+	// step-by-step deletion: .[1] | to_array(@)[0].id
+	e.query.StringSet(".[1] | to_array(@)[0].id")
+	e.queryCursorIdx = e.query.Length()
+
+	e.deleteWordBackward()
+	assert.Equal(".[1] | to_array(@)[0]", e.query.StringGet())
+
+	e.deleteWordBackward()
+	assert.Equal(".[1] | to_array(@)", e.query.StringGet())
+
+	e.deleteWordBackward()
+	assert.Equal(".[1] | ", e.query.StringGet())
+
+	e.deleteWordBackward()
+	assert.Equal(".[1]", e.query.StringGet())
+
+	// simple pipe deletion
+	e.query.StringSet(". | keys(@)")
+	e.deleteWordBackward()
+	assert.Equal(". | ", e.query.StringGet())
+
+	e.deleteWordBackward()
+	assert.Equal(".", e.query.StringGet())
+}
+
+func TestConfirmCandidateJMESPath(t *testing.T) {
+	var assert = assert.New(t)
+
+	// function candidate: strips partial pipe suffix, inserts "| funcname(args)"
+	e := getEngine(`{"users":[{"name":"alice"}]}`, "")
+	e.query.StringSet(".users | len")
+	e.candidates = []string{"length("}
+	e.candidateidx = 0
+	e.confirmCandidate()
+	assert.Equal(".users | length(@)", e.query.StringGet())
+	assert.True(e.queryConfirm)
+
+	// wildcard field candidate: appends .fieldname
+	e.query.StringSet(".users[*]")
+	e.candidates = []string{"age", "name"}
+	e.candidateidx = 1
+	e.confirmCandidate()
+	assert.Equal(".users[*].name", e.query.StringGet())
+
+	// wildcard trailing dot: no double-dot when query ends with "."
+	e.query.StringSet(".users[*].")
+	e.candidates = []string{"age", "name"}
+	e.candidateidx = 1
+	e.confirmCandidate()
+	assert.Equal(".users[*].name", e.query.StringGet())
+
+	// wildcard mid-path (e.g. after index): Contains("[*]") appends .field without PopKeyword
+	e.query.StringSet(".users[*].addr[0]")
+	e.candidates = []string{"city", "zip"}
+	e.candidateidx = 0
+	e.confirmCandidate()
+	assert.Equal(".users[*].addr[0].city", e.query.StringGet())
+
+	// post-expression object field: suffix has "(" → append to full query
+	e.query.StringSet(".[0] | to_array(@)[0]")
+	e.candidates = []string{"id", "name"}
+	e.candidateidx = 0
+	e.confirmCandidate()
+	assert.Equal(".[0] | to_array(@)[0].id", e.query.StringGet())
+
+	// post-expression with trailing dot: no double-dot
+	e.query.StringSet(".[0] | to_array(@)[0].")
+	e.candidates = []string{"id", "name"}
+	e.candidateidx = 0
+	e.confirmCandidate()
+	assert.Equal(".[0] | to_array(@)[0].id", e.query.StringGet())
+}
+
+func TestTabActionJMESPath(t *testing.T) {
+	var assert = assert.New(t)
+
+	// [* → Tab → [*]
+	e := getEngine(`{"items":[{"id":1},{"id":2}]}`, "")
+	e.query.StringSet(".items[*")
+	e.candidatemode = false
+	e.tabAction()
+	assert.Equal(".items[*]", e.query.StringGet())
+
+	// single-element array: complete[1]="[0]" → Tab appends [0]
+	e2 := getEngine(`{"x":42}`, "")
+	e2.query.StringSet(". | to_array(@)")
+	e2.complete = []string{"[0]", "[0]"}
+	e2.candidatemode = false
+	e2.tabAction()
+	assert.Equal(". | to_array(@)[0]", e2.query.StringGet())
+
+	// wildcard sub-projection: [*].field + Tab → appends [0] (eval fixes transparently)
+	e3 := getEngine(`{"items":[{"id":1},{"id":2}]}`, "")
+	e3.query.StringSet(".items[*].id")
+	e3.complete = []string{"[", "["}
+	e3.candidatemode = false
+	e3.tabAction()
+	assert.Equal(".items[*].id[0]", e3.query.StringGet())
 }
 
 func getEngine(j string, qs string) *Engine {

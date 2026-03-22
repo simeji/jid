@@ -2,19 +2,25 @@ version: 2.1
 jobs:
   test:
     docker:
-      - image: circleci/golang:latest
+      - image: cimg/go:1.22
     steps:
       - checkout
-      - run: go test -v ./
-      - run: go test -v ./cmd/jid
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
+      - run: go test -v ./...
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - ~/go/pkg/mod
   release:
     docker:
-      - image: circleci/golang:latest
+      - image: cimg/go:1.22
     steps:
       - checkout
-      - run: 
+      - run:
           name: build jid using goreleaser
-          command: curl -sL https://git.io/goreleaser | bash
+          command: curl -sfL https://goreleaser.com/static/run | bash
 workflows:
   version: 2.1
   test_and_release:

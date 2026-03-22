@@ -74,8 +74,8 @@ func (jm *JsonManager) GetPretty(q QueryInterface, confirm bool) (string, []stri
 // function calls, multi-select hashes, or bare @ references.
 func isJMESPathQuery(qs string) bool {
 	inner := strings.TrimPrefix(qs, ".")
-	// pipe: " | "
-	if strings.Contains(inner, " | ") {
+	// pipe: "|" (with or without surrounding spaces)
+	if strings.Contains(inner, "|") {
 		return true
 	}
 	// wildcard array projection [*] or .*
@@ -102,6 +102,7 @@ func isJMESPathQuery(qs string) bool {
 // ".foo.bar"       -> "foo.bar"
 // ". | keys(@)"    -> "keys(@)"   (root + pipe → just the function)
 // ".foo | keys(@)" -> "foo | keys(@)"
+// ".[0]|keys(@)"   -> "[0]|keys(@)"
 func jmespathExprFromQuery(qs string) string {
 	expr := strings.TrimPrefix(qs, ".")
 	if expr == "" {
@@ -110,6 +111,10 @@ func jmespathExprFromQuery(qs string) string {
 	// ". | func" becomes " | func" after TrimPrefix — strip the leading " | "
 	if strings.HasPrefix(expr, " | ") {
 		return expr[3:]
+	}
+	// ".|func" after TrimPrefix — strip leading "|"
+	if strings.HasPrefix(expr, "|") {
+		return strings.TrimPrefix(expr[1:], " ")
 	}
 	return expr
 }
@@ -128,27 +133,72 @@ func (jm *JsonManager) evalJMESPath(expr string) (*simplejson.Json, error) {
 	return simplejson.NewJson(b)
 }
 
+// evalBaseExpr evaluates expr like evalJMESPath but transparently rewrites
+// wildcard-projection + numeric-index patterns (e.g. "foo[*].bar[0]") to
+// pipe form ("foo[*].bar | [0]") when the direct evaluation returns an empty
+// array. This matches the same fix applied in getFilteredDataJMESPath.
+func (jm *JsonManager) evalBaseExpr(expr string) (*simplejson.Json, error) {
+	result, err := jm.evalJMESPath(expr)
+	// Apply wildcard+index rewrite both when eval errors (e.g. "foo[*].bar[0] | keys(@)"
+	// where keys fails on []) and when it returns an empty array (e.g. "foo[*].bar[0]").
+	needRewrite := err != nil
+	if err == nil {
+		if arr, arrErr := result.Array(); arrErr == nil && len(arr) == 0 {
+			needRewrite = true
+		}
+	}
+	if needRewrite {
+		if m := reWildcardIndexed.FindStringSubmatch(expr); m != nil {
+			pipeExpr := m[1] + " | [" + m[2] + "]" + m[3]
+			if pipeResult, perr := jm.evalJMESPath(pipeExpr); perr == nil {
+				return pipeResult, nil
+			}
+		}
+	}
+	return result, err
+}
+
+// reWildcardFieldTyping matches a JMESPath expression where the user is typing
+// a field name after a wildcard projection, e.g. "foo[*].partial".
+// Group 1: base expression (e.g. "foo[*]"), Group 2: partial field name (may be empty).
+var reWildcardFieldTyping = regexp.MustCompile(`^(.*\[\*\])\.(\w*)$`)
+
+// reWildcardIndexed matches a wildcard projection expression that contains a
+// numeric index after the wildcard, e.g. "foo[*].bar[0]" or "foo[*].bar[0].name".
+// In JMESPath, [N] within a projection applies to each element rather than the
+// projected array.  The fix is to rewrite as "foo[*].bar | [0]" (or
+// "foo[*].bar | [0].name") so [N] indexes the whole projected array.
+// Group 1: expression before [N], Group 2: index digit(s), Group 3: path after [N].
+var reWildcardIndexed = regexp.MustCompile(`^(.*\[\*\].*?)\[(\d+)\](.*)`)
+
+// lastPipeIndex returns the index of the last `|` character in s,
+// ignoring `|` inside filter expressions `[?...]`.
+func lastPipeIndex(s string) int {
+	return strings.LastIndex(s, "|")
+}
+
 // baseExprBeforePipe returns the JMESPath expression that precedes the last
-// ` | ` in the query. Returns "@" if the base is the root (".").
+// `|` (with or without surrounding spaces) in the query.
+// Returns "@" if the base is the root (".").
 // Returns "" if there is no pipe at all.
 func baseExprBeforePipe(qs string) (string, bool) {
 	inner := strings.TrimPrefix(qs, ".")
-	idx := strings.LastIndex(inner, " | ")
+	idx := lastPipeIndex(inner)
 	if idx < 0 {
 		return "", false
 	}
-	base := inner[:idx]
+	base := strings.TrimRight(inner[:idx], " ")
 	if base == "" {
 		return "@", true // root
 	}
 	return base, true
 }
 
-// pipeSuffix returns everything after the last ` | ` in the query.
+// pipeSuffix returns everything after the last `|` in the query (spaces trimmed).
 func pipeSuffix(qs string) string {
 	inner := strings.TrimPrefix(qs, ".")
-	if idx := strings.LastIndex(inner, " | "); idx >= 0 {
-		return inner[idx+3:]
+	if idx := lastPipeIndex(inner); idx >= 0 {
+		return strings.TrimPrefix(inner[idx+1:], " ")
 	}
 	return ""
 }
@@ -168,11 +218,13 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 // JMESPath function name after a pipe: the suffix after " | " contains only
 // identifier characters and no opening parenthesis yet.
 func isFunctionTypingMode(qs string) bool {
-	suffix := pipeSuffix(qs)
-	if suffix == "" {
+	_, hasPipe := baseExprBeforePipe(qs)
+	if !hasPipe {
 		return false
 	}
-	// If there's no "(" yet, the user hasn't completed the function call.
+	suffix := pipeSuffix(qs)
+	// Empty suffix means user just typed "|" and is about to enter a function name.
+	// Return true as long as "(" hasn't appeared yet (function call not yet completed).
 	return !strings.Contains(suffix, "(")
 }
 
@@ -191,21 +243,103 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 				baseResult = jm.origin
 			} else {
 				var berr error
-				baseResult, berr = jm.evalJMESPath(baseExpr)
+				baseResult, berr = jm.evalBaseExpr(baseExpr)
 				if berr != nil {
 					baseResult = jm.origin
 				}
 			}
-			fnCandidates := jm.suggestion.GetFunctionCandidates(suffix)
-			fnSuggest := jm.suggestion.GetFunctionSuggestion(suffix)
+			// When suffix is non-empty, prefer field candidates from the base object.
+			if suffix != "" {
+				fieldCandidates := jm.suggestion.GetCandidateKeys(baseResult, suffix)
+				if len(fieldCandidates) > 0 {
+					fieldSuggest := jm.suggestion.Get(baseResult, suffix)
+					return baseResult, fieldSuggest, fieldCandidates, nil
+				}
+			}
+			baseType := jm.suggestion.GetCurrentType(baseResult)
+			fnCandidates := jm.suggestion.GetFunctionCandidatesFiltered(suffix, baseType)
+			fnSuggest := jm.suggestion.GetFunctionSuggestionFiltered(suffix, baseType)
 			return baseResult, fnSuggest, fnCandidates, nil
 		}
 	}
 
 	// Try evaluating the full expression first.
 	result, err := jm.evalJMESPath(expr)
+	if err != nil {
+		// The expression may contain a wildcard+index pattern whose [N] was
+		// applied to each projected element instead of the array
+		// (e.g. "foo[*].bar[0] | keys(@)"). Rewrite to pipe form and retry.
+		if m := reWildcardIndexed.FindStringSubmatch(expr); m != nil {
+			pipeExpr := m[1] + " | [" + m[2] + "]" + m[3]
+			if pipeResult, perr := jm.evalJMESPath(pipeExpr); perr == nil {
+				result = pipeResult
+				err = nil
+			}
+		}
+	}
 	if err == nil {
-		// Full expression is valid – no function-prefix suggestions needed.
+		// For array results: wildcard projections ([*] or .*) produce an array of
+		// objects; suggest element field keys so the user can type ".fieldname".
+		if arr, arrErr := result.Array(); arrErr == nil {
+			// When the query contains a wildcard ([*] or .*), the result is a
+			// projection. If elements are objects, suggest their field keys so the
+			// user can continue with ".fieldname" rather than "[0]".
+			isWildcardExpr := strings.HasSuffix(expr, "[*]") || strings.HasSuffix(expr, ".*")
+			if isWildcardExpr && len(arr) > 0 {
+				firstEl := result.GetIndex(0)
+				if candidateKeys := getCurrentKeys(firstEl); len(candidateKeys) > 0 {
+					fieldSuggest := jm.suggestion.Get(firstEl, "")
+					return result, fieldSuggest, candidateKeys, nil
+				}
+			}
+			// Empty array may mean the user is typing a partial field name after a
+			// wildcard projection (e.g. "game_indices[*].v"). JMESPath silently drops
+			// null-projected values, so the result is []. Detect this and switch to
+			// field-completion mode using the base wildcard expression.
+			if len(arr) == 0 {
+				// wildcard projection + numeric index (e.g. "foo[*].bar[0]" or
+				// "foo[*].bar[0].name"): JMESPath applies [N] to each projected
+				// element, not the array. Re-evaluate with pipe so [N] indexes
+				// the whole projected array: "foo[*].bar | [0]" or "foo[*].bar | [0].name".
+				if m := reWildcardIndexed.FindStringSubmatch(expr); m != nil {
+					pipeExpr := m[1] + " | [" + m[2] + "]" + m[3]
+					if pipeResult, perr := jm.evalJMESPath(pipeExpr); perr == nil {
+						if candidateKeys := getCurrentKeys(pipeResult); len(candidateKeys) > 0 {
+							fieldSuggest := jm.suggestion.Get(pipeResult, "")
+							return pipeResult, fieldSuggest, candidateKeys, nil
+						}
+						pSuggest := jm.suggestion.Get(pipeResult, "")
+						return pipeResult, pSuggest, []string{}, nil
+					}
+				}
+				if m := reWildcardFieldTyping.FindStringSubmatch(expr); m != nil {
+					baseExpr, partial := m[1], m[2]
+					if baseResult, berr := jm.evalBaseExpr(baseExpr); berr == nil {
+						if baseArr, bArrErr := baseResult.Array(); bArrErr == nil && len(baseArr) > 0 {
+							firstEl := baseResult.GetIndex(0)
+							fieldCandidates := jm.suggestion.GetCandidateKeys(firstEl, partial)
+							// Only switch to field-completion mode if there are matching
+							// candidates. If the partial doesn't match any field, fall
+							// through and show the actual empty-array result.
+							if len(fieldCandidates) > 0 || partial == "" {
+								fieldSuggest := jm.suggestion.Get(firstEl, partial)
+								return baseResult, fieldSuggest, fieldCandidates, nil
+							}
+						}
+					}
+				}
+				// Empty array with no field-completion match: show result without
+				// an index suggestion (appending [0] to an empty projection misleads).
+				return result, []string{"", ""}, []string{}, nil
+			}
+			suggest := jm.suggestion.Get(result, "")
+			return result, suggest, []string{}, nil
+		}
+		// Map (object) result: suggest field keys so the user can keep digging.
+		if candidateKeys := getCurrentKeys(result); len(candidateKeys) > 0 {
+			fieldSuggest := jm.suggestion.Get(result, "")
+			return result, fieldSuggest, candidateKeys, nil
+		}
 		return result, []string{"", ""}, []string{}, nil
 	}
 
@@ -214,25 +348,67 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 	suffix := pipeSuffix(qs)
 
 	if hasPipe {
+		// Suffix ends with ".": user typed a dot to start field navigation after a
+		// complete pipe expression (e.g. ". | to_array(@)[0]."). Try evaluating the
+		// expression without the trailing dot and offer its field candidates.
+		if strings.HasSuffix(suffix, ".") {
+			exprWithoutDot := strings.TrimSuffix(expr, ".")
+			if tempResult, berr := jm.evalJMESPath(exprWithoutDot); berr == nil {
+				if candidateKeys := getCurrentKeys(tempResult); len(candidateKeys) > 0 {
+					fieldSuggest := jm.suggestion.Get(tempResult, "")
+					return tempResult, fieldSuggest, candidateKeys, nil
+				}
+				if arr2, arrErr2 := tempResult.Array(); arrErr2 == nil && len(arr2) > 0 {
+					firstEl := tempResult.GetIndex(0)
+					if candidateKeys := getCurrentKeys(firstEl); len(candidateKeys) > 0 {
+						fieldSuggest := jm.suggestion.Get(firstEl, "")
+						return tempResult, fieldSuggest, candidateKeys, nil
+					}
+				}
+			}
+		}
+
 		// Show the result of the base expression while the user types the function.
 		var baseResult *simplejson.Json
 		if baseExpr == "@" {
 			baseResult = jm.origin
 		} else {
 			var berr error
-			baseResult, berr = jm.evalJMESPath(baseExpr)
+			baseResult, berr = jm.evalBaseExpr(baseExpr)
 			if berr != nil {
 				baseResult = jm.origin
 			}
 		}
 		// Provide function-name candidates matching the typed suffix.
-		fnCandidates := jm.suggestion.GetFunctionCandidates(suffix)
-		fnSuggest := jm.suggestion.GetFunctionSuggestion(suffix)
+		baseType := jm.suggestion.GetCurrentType(baseResult)
+		fnCandidates := jm.suggestion.GetFunctionCandidatesFiltered(suffix, baseType)
+		fnSuggest := jm.suggestion.GetFunctionSuggestionFiltered(suffix, baseType)
 		return baseResult, fnSuggest, fnCandidates, nil
 	}
 
-	// No pipe yet – the expression itself is partially typed but invalid.
-	// Fall back to the origin JSON so the display isn't empty.
+	// No pipe. Check if the user typed a trailing "." to start field navigation
+	// after a wildcard or index expression (e.g. "game_indices[*].").
+	// Strip the dot, re-evaluate, and offer field candidates from the result.
+	if strings.HasSuffix(expr, ".") {
+		baseExpr := strings.TrimSuffix(expr, ".")
+		if baseResult, berr := jm.evalBaseExpr(baseExpr); berr == nil {
+			// Array-of-objects: suggest element field keys (wildcard projection).
+			if arr, arrErr := baseResult.Array(); arrErr == nil && len(arr) > 0 {
+				firstEl := baseResult.GetIndex(0)
+				if candidateKeys := getCurrentKeys(firstEl); len(candidateKeys) > 0 {
+					fieldSuggest := jm.suggestion.Get(firstEl, "")
+					return baseResult, fieldSuggest, candidateKeys, nil
+				}
+			}
+			// Plain object: suggest its keys.
+			if candidateKeys := getCurrentKeys(baseResult); len(candidateKeys) > 0 {
+				fieldSuggest := jm.suggestion.Get(baseResult, "")
+				return baseResult, fieldSuggest, candidateKeys, nil
+			}
+		}
+	}
+
+	// Expression is partially typed but invalid – fall back to origin.
 	return jm.origin, []string{"", ""}, []string{}, nil
 }
 
