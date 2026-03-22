@@ -17,6 +17,9 @@ jobs:
     docker:
       - image: cimg/go:1.22
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:GdKQCwd1f2HsJKRbKm/HBBV6OLVzAfzE1E07od2mRN4"
       - checkout
       - run:
           name: build jid using goreleaser
