@@ -48,9 +48,6 @@ type Engine struct {
 	// placeholder: ghost text at cursor position after function confirmation
 	placeholderStart int // rune index in query; -1 if inactive
 	placeholderLen   int
-	// history navigation
-	history    *History
-	historyTmp string // saves current input while browsing history
 }
 
 type EngineAttribute struct {
@@ -78,7 +75,6 @@ func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 		prettyResult:     ea.PrettyResult,
 		showFuncHelp:     true,
 		placeholderStart: -1,
-		history:          NewHistory(),
 	}
 	e.queryCursorIdx = e.query.Length()
 	return e, nil
@@ -182,10 +178,6 @@ func (e *Engine) Run() EngineResultInterface {
 				e.deleteChar()
 			case termbox.KeyTab:
 				e.tabAction()
-			case termbox.KeyArrowUp:
-				e.historyPrev()
-			case termbox.KeyArrowDown:
-				e.historyNext()
 			case termbox.KeyArrowLeft, termbox.KeyCtrlB:
 				e.moveCursorBackward()
 			case termbox.KeyArrowRight, termbox.KeyCtrlF:
@@ -231,8 +223,6 @@ func (e *Engine) Run() EngineResultInterface {
 					} else {
 						cc, _, _, err = e.manager.Get(e.query, true)
 					}
-					e.history.Add(e.query.StringGet())
-					_ = e.history.Save()
 
 					return &EngineResult{
 						content: cc,
@@ -361,7 +351,6 @@ func (e *Engine) confirmCandidate() {
 }
 
 func (e *Engine) deleteChar() {
-	e.history.ResetIdx()
 	e.clearPlaceholder()
 	if i := e.queryCursorIdx - 1; i > 0 {
 		_ = e.query.Delete(i)
@@ -370,7 +359,6 @@ func (e *Engine) deleteChar() {
 }
 
 func (e *Engine) deleteLineQuery() {
-	e.history.ResetIdx()
 	_ = e.query.StringSet("")
 	e.queryCursorIdx = 0
 }
@@ -600,7 +588,6 @@ func (e *Engine) clearPlaceholder() {
 }
 
 func (e *Engine) inputChar(ch rune) {
-	e.history.ResetIdx()
 	if e.placeholderLen > 0 && e.queryCursorIdx == e.placeholderStart {
 		// Replace placeholder text with the typed character
 		for i := 0; i < e.placeholderLen; i++ {
@@ -643,24 +630,5 @@ func (e *Engine) moveCursorToTop() {
 }
 func (e *Engine) moveCursorToEnd() {
 	e.clearPlaceholder()
-	e.queryCursorIdx = e.query.Length()
-}
-
-func (e *Engine) historyPrev() {
-	if e.history.AtEnd() {
-		e.historyTmp = e.query.StringGet()
-	}
-	if entry, ok := e.history.Prev(); ok {
-		_ = e.query.StringSet(entry)
-		e.queryCursorIdx = e.query.Length()
-	}
-}
-
-func (e *Engine) historyNext() {
-	if entry, ok := e.history.Next(); ok {
-		_ = e.query.StringSet(entry)
-	} else {
-		_ = e.query.StringSet(e.historyTmp)
-	}
 	e.queryCursorIdx = e.query.Length()
 }
