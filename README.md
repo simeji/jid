@@ -196,10 +196,11 @@ cursor_right    = "ctrl+f"
 cursor_to_start = "ctrl+a"
 cursor_to_end   = "ctrl+e"
 toggle_func_help = "ctrl+x"
-tab             = "tab"       # cycle candidates forward (Tab key)
+candidate_next  = "tab"       # cycle candidates forward
+candidate_prev  = "ctrl+p"    # cycle candidates backward (additional key; Shift+Tab always works)
 ```
 
-> **Note:** Shift+Tab is a fixed terminal escape sequence (`\x1b[Z`) and cannot be remapped via config.
+> **Note:** Shift+Tab (`\x1b[Z`) is a fixed terminal escape sequence and always triggers backward cycling regardless of `candidate_prev`.
 
 ### Supported key strings
 

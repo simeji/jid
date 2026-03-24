@@ -647,7 +647,7 @@ func (e *Engine) historyNext() {
 
 func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
 	kb := e.cfg.Keybindings
-	return map[termbox.Key]func(){
+	m := map[termbox.Key]func(){
 		resolveKey(kb.HistoryPrev, "up"):    e.historyPrev,
 		resolveKey(kb.HistoryNext, "down"):  e.historyNext,
 		resolveKey(kb.CursorLeft, "ctrl+b"): e.moveCursorBackward,
@@ -669,7 +669,7 @@ func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
 		resolveKey(kb.ToggleKeymode, "ctrl+l"):  e.toggleKeymode,
 		resolveKey(kb.DeleteLine, "ctrl+u"):     e.deleteLineQuery,
 		resolveKey(kb.DeleteWord, "ctrl+w"):     e.deleteWordBackward,
-		resolveKey(kb.Tab, "tab"): e.tabAction,
+		resolveKey(kb.CandidateNext, "tab"): e.tabAction,
 		resolveKey(kb.ToggleFuncHelp, "ctrl+x"): func() {
 			if e.candidatemode && len(e.candidates) > 0 &&
 				strings.HasSuffix(e.candidates[0], "(") {
@@ -677,4 +677,11 @@ func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
 			}
 		},
 	}
+	// candidate_prev is optional; only add if configured
+	if kb.CandidatePrev != "" {
+		if k, ok := ParseKey(kb.CandidatePrev); ok {
+			m[k] = e.shiftTabAction
+		}
+	}
+	return m
 }

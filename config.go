@@ -24,6 +24,8 @@ type HistoryConfig struct {
 type KeybindingsConfig struct {
 	HistoryPrev    string `toml:"history_prev"`
 	HistoryNext    string `toml:"history_next"`
+	CandidateNext  string `toml:"candidate_next"`  // cycle forward (default: tab)
+	CandidatePrev  string `toml:"candidate_prev"`  // cycle backward (additional key; Shift+Tab always works)
 	ScrollDown     string `toml:"scroll_down"`
 	ScrollUp       string `toml:"scroll_up"`
 	ScrollToBottom string `toml:"scroll_to_bottom"`
@@ -38,7 +40,6 @@ type KeybindingsConfig struct {
 	CursorToStart  string `toml:"cursor_to_start"`
 	CursorToEnd    string `toml:"cursor_to_end"`
 	ToggleFuncHelp string `toml:"toggle_func_help"`
-	Tab            string `toml:"tab"`
 }
 
 func defaultConfig() Config {
@@ -48,6 +49,8 @@ func defaultConfig() Config {
 			MaxSize: historyMaxSize,
 		},
 		Keybindings: KeybindingsConfig{
+			CandidateNext:  "tab",
+			CandidatePrev:  "",
 			HistoryPrev:    "up",
 			HistoryNext:    "down",
 			ScrollDown:     "ctrl+j",
@@ -64,7 +67,6 @@ func defaultConfig() Config {
 			CursorToStart:  "ctrl+a",
 			CursorToEnd:    "ctrl+e",
 			ToggleFuncHelp: "ctrl+x",
-		Tab:            "tab",
 		},
 	}
 }
@@ -119,6 +121,12 @@ func LoadConfig() Config {
 }
 
 func mergeKeybindings(dst *KeybindingsConfig, src KeybindingsConfig) {
+	if src.CandidateNext != "" {
+		dst.CandidateNext = src.CandidateNext
+	}
+	if src.CandidatePrev != "" {
+		dst.CandidatePrev = src.CandidatePrev
+	}
 	if src.HistoryPrev != "" {
 		dst.HistoryPrev = src.HistoryPrev
 	}
@@ -166,8 +174,5 @@ func mergeKeybindings(dst *KeybindingsConfig, src KeybindingsConfig) {
 	}
 	if src.ToggleFuncHelp != "" {
 		dst.ToggleFuncHelp = src.ToggleFuncHelp
-	}
-	if src.Tab != "" {
-		dst.Tab = src.Tab
 	}
 }
