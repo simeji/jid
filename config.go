@@ -38,6 +38,7 @@ type KeybindingsConfig struct {
 	CursorToStart  string `toml:"cursor_to_start"`
 	CursorToEnd    string `toml:"cursor_to_end"`
 	ToggleFuncHelp string `toml:"toggle_func_help"`
+	Tab            string `toml:"tab"`
 }
 
 func defaultConfig() Config {
@@ -63,6 +64,7 @@ func defaultConfig() Config {
 			CursorToStart:  "ctrl+a",
 			CursorToEnd:    "ctrl+e",
 			ToggleFuncHelp: "ctrl+x",
+		Tab:            "tab",
 		},
 	}
 }
@@ -164,5 +166,8 @@ func mergeKeybindings(dst *KeybindingsConfig, src KeybindingsConfig) {
 	}
 	if src.ToggleFuncHelp != "" {
 		dst.ToggleFuncHelp = src.ToggleFuncHelp
+	}
+	if src.Tab != "" {
+		dst.Tab = src.Tab
 	}
 }

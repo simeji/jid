@@ -183,8 +183,6 @@ func (e *Engine) Run() EngineResultInterface {
 				}
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				e.deleteChar()
-			case termbox.KeyTab:
-				e.tabAction()
 			case termbox.KeyArrowLeft:
 				e.moveCursorBackward()
 			case termbox.KeyArrowRight:
@@ -671,6 +669,7 @@ func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
 		resolveKey(kb.ToggleKeymode, "ctrl+l"):  e.toggleKeymode,
 		resolveKey(kb.DeleteLine, "ctrl+u"):     e.deleteLineQuery,
 		resolveKey(kb.DeleteWord, "ctrl+w"):     e.deleteWordBackward,
+		resolveKey(kb.Tab, "tab"): e.tabAction,
 		resolveKey(kb.ToggleFuncHelp, "ctrl+x"): func() {
 			if e.candidatemode && len(e.candidates) > 0 &&
 				strings.HasSuffix(e.candidates[0], "(") {

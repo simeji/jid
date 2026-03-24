@@ -196,7 +196,10 @@ cursor_right    = "ctrl+f"
 cursor_to_start = "ctrl+a"
 cursor_to_end   = "ctrl+e"
 toggle_func_help = "ctrl+x"
+tab             = "tab"       # cycle candidates forward (Tab key)
 ```
+
+> **Note:** Shift+Tab is a fixed terminal escape sequence (`\x1b[Z`) and cannot be remapped via config.
 
 ### Supported key strings
 
