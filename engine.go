@@ -48,6 +48,10 @@ type Engine struct {
 	// placeholder: ghost text at cursor position after function confirmation
 	placeholderStart int // rune index in query; -1 if inactive
 	placeholderLen   int
+	// history navigation
+	history    *History
+	historyTmp string // saves current input while browsing history
+	cfg        Config
 }
 
 type EngineAttribute struct {
@@ -75,7 +79,9 @@ func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 		prettyResult:     ea.PrettyResult,
 		showFuncHelp:     true,
 		placeholderStart: -1,
+		cfg:              LoadConfig(),
 	}
+	e.history = NewHistory(e.cfg.HistoryPath(), e.cfg.History.MaxSize)
 	e.queryCursorIdx = e.query.Length()
 	return e, nil
 }
@@ -110,6 +116,7 @@ func (e *Engine) Run() EngineResultInterface {
 	defer termbox.Close()
 
 	var contents []string
+	actionMap := e.buildActionMap(&contents)
 
 	for {
 
@@ -178,34 +185,19 @@ func (e *Engine) Run() EngineResultInterface {
 				e.deleteChar()
 			case termbox.KeyTab:
 				e.tabAction()
-			case termbox.KeyArrowLeft, termbox.KeyCtrlB:
+			case termbox.KeyArrowLeft:
 				e.moveCursorBackward()
-			case termbox.KeyArrowRight, termbox.KeyCtrlF:
+			case termbox.KeyArrowRight:
 				e.moveCursorForward()
-			case termbox.KeyHome, termbox.KeyCtrlA:
+			case termbox.KeyHome:
 				e.moveCursorToTop()
-			case termbox.KeyEnd, termbox.KeyCtrlE:
+			case termbox.KeyEnd:
 				e.moveCursorToEnd()
-			case termbox.KeyCtrlK:
-				e.scrollToAbove()
-			case termbox.KeyCtrlJ:
-				e.scrollToBelow()
-			case termbox.KeyCtrlG:
-				e.scrollToBottom(len(contents))
-			case termbox.KeyCtrlT:
-				e.scrollToTop()
-			case termbox.KeyCtrlN:
-				_, h := termbox.Size()
-				e.scrollPageDown(len(contents), h)
-			case termbox.KeyCtrlP:
-				_, h := termbox.Size()
-				e.scrollPageUp(h)
-			case termbox.KeyCtrlL:
-				e.toggleKeymode()
-			case termbox.KeyCtrlU:
-				e.deleteLineQuery()
-			case termbox.KeyCtrlW:
-				e.deleteWordBackward()
+			case termbox.KeyCtrlX:
+				if e.candidatemode && len(e.candidates) > 0 &&
+					strings.HasSuffix(e.candidates[0], "(") {
+					e.showFuncHelp = !e.showFuncHelp
+				}
 			case termbox.KeyEsc:
 				// Save candidate state in case this Esc is the start of Shift+Tab (\x1b[Z)
 				e.savedCandidates = e.candidates
@@ -223,6 +215,8 @@ func (e *Engine) Run() EngineResultInterface {
 					} else {
 						cc, _, _, err = e.manager.Get(e.query, true)
 					}
+					e.history.Add(e.query.StringGet())
+					_ = e.history.Save()
 
 					return &EngineResult{
 						content: cc,
@@ -231,14 +225,12 @@ func (e *Engine) Run() EngineResultInterface {
 					}
 				}
 				e.confirmCandidate()
-			case termbox.KeyCtrlX:
-				if e.candidatemode && len(e.candidates) > 0 &&
-					strings.HasSuffix(e.candidates[0], "(") {
-					e.showFuncHelp = !e.showFuncHelp
-				}
 			case termbox.KeyCtrlC:
 				return &EngineResult{}
 			default:
+				if fn, ok := actionMap[ev.Key]; ok {
+					fn()
+				}
 			}
 		case termbox.EventError:
 			panic(ev.Err)
@@ -351,6 +343,7 @@ func (e *Engine) confirmCandidate() {
 }
 
 func (e *Engine) deleteChar() {
+	e.history.ResetIdx()
 	e.clearPlaceholder()
 	if i := e.queryCursorIdx - 1; i > 0 {
 		_ = e.query.Delete(i)
@@ -359,6 +352,7 @@ func (e *Engine) deleteChar() {
 }
 
 func (e *Engine) deleteLineQuery() {
+	e.history.ResetIdx()
 	_ = e.query.StringSet("")
 	e.queryCursorIdx = 0
 }
@@ -588,6 +582,7 @@ func (e *Engine) clearPlaceholder() {
 }
 
 func (e *Engine) inputChar(ch rune) {
+	e.history.ResetIdx()
 	if e.placeholderLen > 0 && e.queryCursorIdx == e.placeholderStart {
 		// Replace placeholder text with the typed character
 		for i := 0; i < e.placeholderLen; i++ {
@@ -631,4 +626,56 @@ func (e *Engine) moveCursorToTop() {
 func (e *Engine) moveCursorToEnd() {
 	e.clearPlaceholder()
 	e.queryCursorIdx = e.query.Length()
+}
+
+func (e *Engine) historyPrev() {
+	if e.history.AtEnd() {
+		e.historyTmp = e.query.StringGet()
+	}
+	if entry, ok := e.history.Prev(); ok {
+		_ = e.query.StringSet(entry)
+		e.queryCursorIdx = e.query.Length()
+	}
+}
+
+func (e *Engine) historyNext() {
+	if entry, ok := e.history.Next(); ok {
+		_ = e.query.StringSet(entry)
+	} else {
+		_ = e.query.StringSet(e.historyTmp)
+	}
+	e.queryCursorIdx = e.query.Length()
+}
+
+func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
+	kb := e.cfg.Keybindings
+	return map[termbox.Key]func(){
+		resolveKey(kb.HistoryPrev, "up"):    e.historyPrev,
+		resolveKey(kb.HistoryNext, "down"):  e.historyNext,
+		resolveKey(kb.CursorLeft, "ctrl+b"): e.moveCursorBackward,
+		resolveKey(kb.CursorRight, "ctrl+f"): e.moveCursorForward,
+		resolveKey(kb.CursorToStart, "ctrl+a"): e.moveCursorToTop,
+		resolveKey(kb.CursorToEnd, "ctrl+e"):   e.moveCursorToEnd,
+		resolveKey(kb.ScrollDown, "ctrl+j"):     e.scrollToBelow,
+		resolveKey(kb.ScrollUp, "ctrl+k"):       e.scrollToAbove,
+		resolveKey(kb.ScrollToBottom, "ctrl+g"): func() { e.scrollToBottom(len(*contents)) },
+		resolveKey(kb.ScrollToTop, "ctrl+t"):    e.scrollToTop,
+		resolveKey(kb.ScrollPageDown, "ctrl+n"): func() {
+			_, h := termbox.Size()
+			e.scrollPageDown(len(*contents), h)
+		},
+		resolveKey(kb.ScrollPageUp, "ctrl+p"): func() {
+			_, h := termbox.Size()
+			e.scrollPageUp(h)
+		},
+		resolveKey(kb.ToggleKeymode, "ctrl+l"):  e.toggleKeymode,
+		resolveKey(kb.DeleteLine, "ctrl+u"):     e.deleteLineQuery,
+		resolveKey(kb.DeleteWord, "ctrl+w"):     e.deleteWordBackward,
+		resolveKey(kb.ToggleFuncHelp, "ctrl+x"): func() {
+			if e.candidatemode && len(e.candidates) > 0 &&
+				strings.HasSuffix(e.candidates[0], "(") {
+				e.showFuncHelp = !e.showFuncHelp
+			}
+		},
+	}
 }

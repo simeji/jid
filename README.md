@@ -148,6 +148,8 @@ jid < file.json
 |`CTRL` + `P`|Scroll json buffer 'Page Up'|
 |`CTRL` + `L`|Change view mode whole json or keys (only object)|
 |`ESC`|Hide a candidate box|
+|Up Arrow|Navigate to previous query in history|
+|Down Arrow|Navigate to next query in history|
 
 ### Option
 
@@ -159,6 +161,50 @@ jid < file.json
 |-version | print the version and exit|
 |-q | Output query mode (for jq)|
 |-M | monochrome output mode|
+
+## Configuration
+
+jid can be configured via a TOML file located at:
+
+| OS | Path |
+|:---|:-----|
+| macOS | `~/Library/Application Support/jid/config.toml` |
+| Linux | `~/.config/jid/config.toml` |
+| Windows | `%AppData%\jid\config.toml` |
+
+### Example config.toml
+
+```toml
+[history]
+path = "~/.jid_history"  # custom history file path
+max_size = 1000           # number of entries to keep
+
+[keybindings]
+history_prev    = "up"      # navigate to older query
+history_next    = "down"    # navigate to newer query
+scroll_down     = "ctrl+j"
+scroll_up       = "ctrl+k"
+scroll_to_bottom = "ctrl+g"
+scroll_to_top   = "ctrl+t"
+scroll_page_down = "ctrl+n"
+scroll_page_up  = "ctrl+p"
+toggle_keymode  = "ctrl+l"
+delete_line     = "ctrl+u"
+delete_word     = "ctrl+w"
+cursor_left     = "ctrl+b"
+cursor_right    = "ctrl+f"
+cursor_to_start = "ctrl+a"
+cursor_to_end   = "ctrl+e"
+toggle_func_help = "ctrl+x"
+```
+
+### Supported key strings
+
+`ctrl+a` … `ctrl+z`, `up`, `down`, `left`, `right`, `tab`, `enter`, `esc`, `backspace`, `home`, `end`, `pgup`, `pgdn`, `delete`, `f1` … `f12`
+
+### Query History
+
+Queries are saved automatically on Enter. The history file path follows the same OS convention as the config file (e.g. `~/Library/Application Support/jid/history` on macOS) unless overridden in `config.toml`.
 
 ## JMESPath Support
 
