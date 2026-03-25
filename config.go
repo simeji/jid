@@ -100,8 +100,11 @@ func expandPath(path string) string {
 // LoadConfig reads ~/.config/jid/config.toml (or OS equivalent).
 // Missing fields fall back to defaults; missing file returns defaults silently.
 func LoadConfig() Config {
+	return loadConfigFromPath(configFilePath())
+}
+
+func loadConfigFromPath(path string) Config {
 	cfg := defaultConfig()
-	path := configFilePath()
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return cfg
 	}

@@ -25,9 +25,6 @@ func historyFilePath() string {
 }
 
 func NewHistory(path string, maxSize int) *History {
-	if path == "" {
-		path = historyFilePath()
-	}
 	if maxSize <= 0 {
 		maxSize = historyMaxSize
 	}
@@ -36,7 +33,9 @@ func NewHistory(path string, maxSize int) *History {
 		maxSize: maxSize,
 		path:    path,
 	}
-	_ = h.load()
+	if path != "" {
+		_ = h.load()
+	}
 	h.idx = len(h.entries)
 	return h
 }
@@ -111,6 +110,9 @@ func (h *History) load() error {
 }
 
 func (h *History) Save() error {
+	if h.path == "" {
+		return nil
+	}
 	if err := os.MkdirAll(filepath.Dir(h.path), 0755); err != nil {
 		return err
 	}
