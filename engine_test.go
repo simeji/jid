@@ -479,6 +479,32 @@ func TestTabActionJMESPath(t *testing.T) {
 	assert.Equal(".items[*].id[0]", e3.query.StringGet())
 }
 
+func TestFindKeyLineInContents(t *testing.T) {
+	contents := []string{
+		`{`,
+		`  "name": "alice",`,
+		`  "age": 30,`,
+		`  "url": "https://example.com/name"`,
+		`}`,
+	}
+	assert.Equal(t, 1, findKeyLineInContents(contents, "name"))
+	assert.Equal(t, 2, findKeyLineInContents(contents, "age"))
+	// "name" appears in a string value on line 3, not as a key → should not match
+	assert.Equal(t, -1, findKeyLineInContents(contents, "missing"))
+	assert.Equal(t, -1, findKeyLineInContents(contents, "alice"))
+}
+
+func TestFindKeyLineInContentsEmpty(t *testing.T) {
+	assert.Equal(t, -1, findKeyLineInContents([]string{}, "name"))
+	assert.Equal(t, -1, findKeyLineInContents([]string{"{", "}"}, "name"))
+}
+
+func TestFindKeyLineInContentsFirst(t *testing.T) {
+	// key on first line
+	contents := []string{`{"id": 1}`}
+	assert.Equal(t, 0, findKeyLineInContents(contents, "id"))
+}
+
 func getEngine(j string, qs string) *Engine {
 	r := bytes.NewBufferString(j)
 	e, _ := NewEngine(r, &EngineAttribute{

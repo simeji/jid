@@ -131,7 +131,7 @@ jid < file.json
 
 |key|description|
 |:-----------|:----------|
-|`TAB` / `CTRL` + `I` |Show available items and choose them (cycles forward)|
+|`TAB` / `CTRL` + `I` |Show available items and choose them (cycles forward); highlights the matching key in the JSON view|
 |`Shift` + `TAB` |Cycle candidates backward / decrement array index|
 |`CTRL` + `W` |Delete one JMESPath segment backward (e.g. `.id` → `[0]` → `func(@)` → pipe)|
 |`CTRL` + `U` |Delete whole query|
@@ -267,6 +267,10 @@ When you type `|` after a field, jid shows available JMESPath functions filtered
 | Number | `abs`, `ceil`, `floor`, `not_null`, `to_array`, `to_string`, `type` |
 
 A usage description is shown below the candidate list (toggle with `Ctrl+X`).
+
+### Candidate Key Highlighting
+
+When cycling through field candidates with `Tab` / `Shift+Tab`, the corresponding key in the JSON output is highlighted in yellow. If the key is outside the visible area, the JSON view automatically scrolls to bring it into view.
 
 ### Function Argument Templates
 

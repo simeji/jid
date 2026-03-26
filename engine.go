@@ -52,6 +52,8 @@ type Engine struct {
 	history    *History
 	historyTmp string // saves current input while browsing history
 	cfg        Config
+	// candidate key highlighting / auto-scroll
+	candidateScrollNeeded bool
 }
 
 type EngineAttribute struct {
@@ -140,17 +142,43 @@ func (e *Engine) Run() EngineResultInterface {
 				funcHelp = FunctionDescription(selected) + "  [Ctrl+X: hide]"
 			}
 		}
+
+		// Determine the selected field candidate (non-function) for JSON key highlighting.
+		selectedCandidate := ""
+		if e.candidatemode && !e.keymode && len(e.candidates) > 0 {
+			sel := e.candidates[e.candidateidx%len(e.candidates)]
+			if !strings.HasSuffix(sel, "(") {
+				selectedCandidate = sel
+				// Auto-scroll so the highlighted key is visible when Tab/Shift+Tab was pressed.
+				if e.candidateScrollNeeded {
+					e.candidateScrollNeeded = false
+					_, h := termbox.Size()
+					if foundLine := findKeyLineInContents(contents, sel); foundLine >= 0 {
+						visibleEnd := e.contentOffset + h - DefaultY
+						if foundLine < e.contentOffset || foundLine >= visibleEnd {
+							e.contentOffset = foundLine
+						}
+					}
+				}
+			} else {
+				e.candidateScrollNeeded = false
+			}
+		} else {
+			e.candidateScrollNeeded = false
+		}
+
 		ta := &TerminalDrawAttributes{
-			Query:            e.query.StringGet(),
-			Contents:         contents,
-			CandidateIndex:   e.candidateidx,
-			ContentsOffsetY:  e.contentOffset,
-			Complete:         e.complete[0],
-			Candidates:       e.candidates,
-			CursorOffset:     e.query.IndexOffset(e.queryCursorIdx),
-			FuncHelp:         funcHelp,
-			PlaceholderStart: e.placeholderStart,
-			PlaceholderLen:   e.placeholderLen,
+			Query:             e.query.StringGet(),
+			Contents:          contents,
+			CandidateIndex:    e.candidateidx,
+			ContentsOffsetY:   e.contentOffset,
+			Complete:          e.complete[0],
+			Candidates:        e.candidates,
+			CursorOffset:      e.query.IndexOffset(e.queryCursorIdx),
+			FuncHelp:          funcHelp,
+			PlaceholderStart:  e.placeholderStart,
+			PlaceholderLen:    e.placeholderLen,
+			SelectedCandidate: selectedCandidate,
 		}
 		err = e.term.Draw(ta)
 		if err != nil {
@@ -509,6 +537,7 @@ func (e *Engine) tabAction() {
 		}
 		e.candidateidx = (e.candidateidx + 1) % len(e.candidates)
 		e.queryCursorIdx = e.query.Length()
+		e.candidateScrollNeeded = true
 		return
 	}
 	// Array index increment: query ends with [N], works in all contexts.
@@ -567,6 +596,7 @@ func (e *Engine) shiftTabAction() {
 			e.candidateidx--
 		}
 		e.queryCursorIdx = e.query.Length()
+		e.candidateScrollNeeded = true
 		return
 	}
 	e.changeArrayIndex(-1)
@@ -643,6 +673,23 @@ func (e *Engine) historyNext() {
 		_ = e.query.StringSet(e.historyTmp)
 	}
 	e.queryCursorIdx = e.query.Length()
+}
+
+// findKeyLineInContents returns the first line index in contents where `key`
+// appears as a JSON object key (i.e. `"key":` pattern). Returns -1 if not found.
+func findKeyLineInContents(contents []string, key string) int {
+	pattern := `"` + key + `"`
+	for i, row := range contents {
+		idx := strings.Index(row, pattern)
+		if idx < 0 {
+			continue
+		}
+		rest := strings.TrimLeft(row[idx+len(pattern):], " \t")
+		if strings.HasPrefix(rest, ":") {
+			return i
+		}
+	}
+	return -1
 }
 
 func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
