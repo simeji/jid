@@ -209,9 +209,24 @@ cursor_to_end   = "ctrl+e"
 toggle_func_help = "ctrl+x"
 candidate_next  = "tab"       # cycle candidates forward
 candidate_prev  = "ctrl+p"    # cycle candidates backward (additional key; Shift+Tab always works)
+quit            = "ctrl+q"    # exit jid (used when exit_on_enter = false)
+
+[behavior]
+exit_on_enter = true   # set to false to prevent accidental exit on Enter
 ```
 
 > **Note:** Shift+Tab (`\x1b[Z`) is a fixed terminal escape sequence and always triggers backward cycling regardless of `candidate_prev`.
+
+### Preventing accidental exit on Enter
+
+By default, pressing Enter exits jid and prints the current result. If you find yourself accidentally exiting, set `exit_on_enter = false` in `config.toml`:
+
+```toml
+[behavior]
+exit_on_enter = false
+```
+
+When disabled, Enter only confirms a candidate selection. Use `Ctrl+Q` (or your configured `quit` key) to exit.
 
 ### Supported key strings
 

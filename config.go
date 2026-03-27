@@ -12,6 +12,22 @@ import (
 type Config struct {
 	History     HistoryConfig     `toml:"history"`
 	Keybindings KeybindingsConfig `toml:"keybindings"`
+	Behavior    BehaviorConfig    `toml:"behavior"`
+}
+
+// BehaviorConfig controls general jid behaviour.
+type BehaviorConfig struct {
+	// ExitOnEnter controls whether Enter exits jid (default: true for backwards compatibility).
+	// Set to false to make Enter only confirm a candidate; use the quit keybinding to exit.
+	ExitOnEnter *bool `toml:"exit_on_enter"`
+}
+
+// IsExitOnEnter returns true when Enter should exit jid (the default).
+func (c *Config) IsExitOnEnter() bool {
+	if c.Behavior.ExitOnEnter == nil {
+		return true
+	}
+	return *c.Behavior.ExitOnEnter
 }
 
 // HistoryConfig controls query history behaviour.
@@ -40,6 +56,7 @@ type KeybindingsConfig struct {
 	CursorToStart  string `toml:"cursor_to_start"`
 	CursorToEnd    string `toml:"cursor_to_end"`
 	ToggleFuncHelp string `toml:"toggle_func_help"`
+	Quit           string `toml:"quit"`
 }
 
 func defaultConfig() Config {
@@ -67,6 +84,7 @@ func defaultConfig() Config {
 			CursorToStart:  "ctrl+a",
 			CursorToEnd:    "ctrl+e",
 			ToggleFuncHelp: "ctrl+x",
+			Quit:           "ctrl+q",
 		},
 	}
 }
@@ -120,6 +138,9 @@ func loadConfigFromPath(path string) Config {
 		cfg.History.MaxSize = fileCfg.History.MaxSize
 	}
 	mergeKeybindings(&cfg.Keybindings, fileCfg.Keybindings)
+	if fileCfg.Behavior.ExitOnEnter != nil {
+		cfg.Behavior.ExitOnEnter = fileCfg.Behavior.ExitOnEnter
+	}
 	return cfg
 }
 
@@ -177,5 +198,8 @@ func mergeKeybindings(dst *KeybindingsConfig, src KeybindingsConfig) {
 	}
 	if src.ToggleFuncHelp != "" {
 		dst.ToggleFuncHelp = src.ToggleFuncHelp
+	}
+	if src.Quit != "" {
+		dst.Quit = src.Quit
 	}
 }
