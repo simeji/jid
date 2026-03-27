@@ -1,5 +1,7 @@
 # jid
 
+[![Test](https://github.com/simeji/jid/actions/workflows/test.yml/badge.svg)](https://github.com/simeji/jid/actions/workflows/test.yml)
+
 Json Incremental Digger
 
 It's a very simple tool.
