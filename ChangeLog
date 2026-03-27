@@ -1,6 +1,24 @@
 ChangeLog
 =======
 
+### 1.1.1 - Mar 28 2026
+
+Features:
+* Add `exit_on_enter` config option to prevent accidental exit on Enter
+* Add configurable `quit` keybinding (default: Ctrl+Q) for use with `exit_on_enter = false`
+
+### 1.1.0 - Mar 28 2026
+
+Features:
+* Query history: persist queries across sessions, navigate with Up/Down arrows
+* TOML config file support (`~/Library/Application Support/jid/config.toml` on macOS)
+* Configurable keybindings via `[keybindings]` section in config.toml
+* JSON key highlighting in yellow when Tab-cycling candidates or typing a partial query
+* Auto-scroll to bring highlighted key into view
+* Wildcard projection field suggestions (`.users[*].<Tab>`)
+* JMESPath function candidates filtered by input type
+* Key highlight restricted to correct nesting level
+
 ### 1.0.0 - Mar 23 2026
 
 Features:
