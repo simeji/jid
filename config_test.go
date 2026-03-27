@@ -116,3 +116,54 @@ func TestMergeKeybindingsEmpty(t *testing.T) {
 	// nothing should change
 	assert.Equal(t, defaultConfig().Keybindings, dst)
 }
+
+func TestDefaultConfigExitOnEnter(t *testing.T) {
+	cfg := defaultConfig()
+	// Default: ExitOnEnter not set (nil) → IsExitOnEnter returns true
+	assert.Nil(t, cfg.Behavior.ExitOnEnter)
+	assert.True(t, cfg.IsExitOnEnter())
+	assert.Equal(t, "ctrl+q", cfg.Keybindings.Quit)
+}
+
+func TestLoadConfigExitOnEnterFalse(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	content := `
+[behavior]
+exit_on_enter = false
+`
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+
+	cfg := loadConfigFromPath(path)
+	assert.NotNil(t, cfg.Behavior.ExitOnEnter)
+	assert.False(t, cfg.IsExitOnEnter())
+}
+
+func TestLoadConfigExitOnEnterTrue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	content := `
+[behavior]
+exit_on_enter = true
+`
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+
+	cfg := loadConfigFromPath(path)
+	assert.NotNil(t, cfg.Behavior.ExitOnEnter)
+	assert.True(t, cfg.IsExitOnEnter())
+}
+
+func TestLoadConfigCustomQuitKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	content := `
+[keybindings]
+quit = "ctrl+d"
+`
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
+
+	cfg := loadConfigFromPath(path)
+	assert.Equal(t, "ctrl+d", cfg.Keybindings.Quit)
+	// other fields unchanged
+	assert.Equal(t, "tab", cfg.Keybindings.CandidateNext)
+}

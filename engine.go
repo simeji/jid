@@ -54,6 +54,8 @@ type Engine struct {
 	cfg        Config
 	// candidate key highlighting / auto-scroll
 	candidateScrollNeeded bool
+	// quit requested via quit keybinding
+	quitRequested bool
 }
 
 type EngineAttribute struct {
@@ -250,7 +252,9 @@ func (e *Engine) Run() EngineResultInterface {
 				e.bracketPending = false
 				e.escapeCandidateMode()
 			case termbox.KeyEnter:
-				if !e.candidatemode {
+				if e.candidatemode {
+					e.confirmCandidate()
+				} else if e.cfg.IsExitOnEnter() {
 					var cc string
 					var err error
 					if e.prettyResult {
@@ -267,12 +271,27 @@ func (e *Engine) Run() EngineResultInterface {
 						err:     err,
 					}
 				}
-				e.confirmCandidate()
 			case termbox.KeyCtrlC:
 				return &EngineResult{}
 			default:
 				if fn, ok := actionMap[ev.Key]; ok {
 					fn()
+					if e.quitRequested {
+						var cc string
+						var err error
+						if e.prettyResult {
+							cc, _, _, err = e.manager.GetPretty(e.query, true)
+						} else {
+							cc, _, _, err = e.manager.Get(e.query, true)
+						}
+						e.history.Add(e.query.StringGet())
+						_ = e.history.Save()
+						return &EngineResult{
+							content: cc,
+							qs:      e.query.StringGet(),
+							err:     err,
+						}
+					}
 				}
 			}
 		case termbox.EventError:
@@ -618,6 +637,10 @@ func (e *Engine) shiftTabAction() {
 	}
 	e.changeArrayIndex(-1)
 }
+func (e *Engine) setQuitRequested() {
+	e.quitRequested = true
+}
+
 func (e *Engine) escapeCandidateMode() {
 	e.candidatemode = false
 }
@@ -759,6 +782,14 @@ func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
 		if k, ok := ParseKey(kb.CandidatePrev); ok {
 			m[k] = e.shiftTabAction
 		}
+	}
+	// quit: only active when exit_on_enter = false; saves history and exits cleanly
+	quitKey := kb.Quit
+	if quitKey == "" {
+		quitKey = "ctrl+q"
+	}
+	if k, ok := ParseKey(quitKey); ok {
+		m[k] = e.setQuitRequested
 	}
 	return m
 }
