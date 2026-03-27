@@ -1,5 +1,7 @@
 # jid
 
+<img src="https://github.com/user-attachments/assets/78b0ee4c-2171-4557-b690-50d503f91190" alt="jid logo" width="120" />
+
 [![Test](https://github.com/simeji/jid/actions/workflows/test.yml/badge.svg)](https://github.com/simeji/jid/actions/workflows/test.yml)
 
 Json Incremental Digger
