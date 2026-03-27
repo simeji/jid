@@ -164,6 +164,21 @@ func (e *Engine) Run() EngineResultInterface {
 				}
 			}
 			e.candidateScrollNeeded = false
+		} else if !e.candidatemode && !e.keymode && e.complete[0] != "" && e.complete[1] != "" {
+			// Typing narrows to a single suggestion (green hint shown) — highlight and
+			// auto-scroll immediately so the user can see where they are navigating.
+			keyName := e.complete[1]
+			foundLine, foundIndent := findKeyLineInContents(contents, keyName)
+			if foundLine >= 0 {
+				selectedCandidate = keyName
+				selectedCandidateIndent = foundIndent
+				_, h := termbox.Size()
+				visibleEnd := e.contentOffset + h - DefaultY
+				if foundLine < e.contentOffset || foundLine >= visibleEnd {
+					e.contentOffset = foundLine
+				}
+			}
+			e.candidateScrollNeeded = false
 		} else {
 			e.candidateScrollNeeded = false
 		}
