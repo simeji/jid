@@ -11,7 +11,17 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ## Demo
 
-![demo-jid-main](https://github.com/simeji/jid/wiki/images/demo-jid-main-640-colorize.gif)
+### Drill-down navigation
+
+Interactively navigate JSON using dot-path queries. Tab-complete fields, cycle through candidates, and see the matching key highlighted in the JSON view in real time.
+
+![demo-jid-drilldown](https://github.com/user-attachments/assets/b37e5a62-e9e4-4ec5-9cc8-e4ca9180a744)
+
+### JMESPath expressions
+
+Use pipes, wildcards, and built-in functions directly in the filter. Function candidates are shown with usage hints and argument templates are filled in automatically.
+
+![demo-jid-jmespath](https://github.com/user-attachments/assets/d6cb5cc7-4e66-4b66-b7bb-c4cc50e8b050)
 
 ## Installation
 
@@ -101,7 +111,6 @@ Then, you press Enter key and output `[1,2]` and exit.
 
 #### simple json example2
 
-This json is used by [demo section](https://github.com/simeji/jid#demo).
 ```
 echo '{"info":{"date":"2016-10-23","version":1.0},"users":[{"name":"simeji","uri":"https://github.com/simeji","id":1},{"name":"simeji2","uri":"https://example.com/simeji","id":2},{"name":"simeji3","uri":"https://example.com/simeji3","id":3}],"userCount":3}}'|jid
 ```
