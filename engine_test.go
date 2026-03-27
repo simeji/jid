@@ -479,6 +479,40 @@ func TestTabActionJMESPath(t *testing.T) {
 	assert.Equal(".items[*].id[0]", e3.query.StringGet())
 }
 
+// TestGetContentsCompleteSingleMatch validates the preconditions for the
+// "highlight while typing" feature: when a partial query narrows candidates to
+// one, complete[1] holds the full key name and candidatemode is false.
+func TestGetContentsCompleteSingleMatch(t *testing.T) {
+	e := getEngine(`{"name":"alice","foo":"bar"}`, "")
+	e.query.StringSet(".na")
+	e.queryCursorIdx = e.query.Length()
+	e.getContents()
+	// complete[0] = suffix to display in green ("me"), complete[1] = full key ("name")
+	assert.Equal(t, "me", e.complete[0])
+	assert.Equal(t, "name", e.complete[1])
+	// candidatemode must be false so the "typing hint" branch activates
+	e.setCandidateData()
+	assert.False(t, e.candidatemode)
+}
+
+// TestGetContentsCompleteMultiMatch confirms that with multiple matches
+// complete[1] is the common-prefix partial (not a real key), so
+// findKeyLineInContents will return -1 and no highlighting is triggered.
+func TestGetContentsCompleteMultiMatch(t *testing.T) {
+	e := getEngine(`{"name":"alice","naming":"bob","foo":"bar"}`, "")
+	e.query.StringSet(".na")
+	e.queryCursorIdx = e.query.Length()
+	e.getContents()
+	// common suffix "m"; complete[1]="nam" is a partial prefix, not a real key
+	assert.Equal(t, "m", e.complete[0])
+	assert.Equal(t, "nam", e.complete[1])
+	assert.Equal(t, []string{"name", "naming"}, e.candidates)
+	// "nam" is not a real JSON key → no highlight line found
+	contents := []string{`{`, `  "name": "alice",`, `  "naming": "bob"`, `}`}
+	line, _ := findKeyLineInContents(contents, e.complete[1])
+	assert.Equal(t, -1, line)
+}
+
 func TestFindKeyLineInContents(t *testing.T) {
 	contents := []string{
 		`{`,

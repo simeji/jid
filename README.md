@@ -270,7 +270,12 @@ A usage description is shown below the candidate list (toggle with `Ctrl+X`).
 
 ### Candidate Key Highlighting
 
-When cycling through field candidates with `Tab` / `Shift+Tab`, the corresponding key in the JSON output is highlighted in yellow. If the key is outside the visible area, the JSON view automatically scrolls to bring it into view.
+The matching JSON key is highlighted in yellow and the view auto-scrolls to it in two situations:
+
+- **While typing** — as soon as the query narrows down to a single candidate (e.g. typing `.na` when only `name` matches), the corresponding key is highlighted immediately, before pressing `Tab`.
+- **While cycling with `Tab` / `Shift+Tab`** — the key for each selected candidate is highlighted as you cycle through the list.
+
+In both cases, if the key is outside the visible area the JSON view scrolls to bring it into view. Only the key at the correct nesting level is highlighted — nested keys with the same name are ignored.
 
 ### Function Argument Templates
 
