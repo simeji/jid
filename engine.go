@@ -145,40 +145,42 @@ func (e *Engine) Run() EngineResultInterface {
 
 		// Determine the selected field candidate (non-function) for JSON key highlighting.
 		selectedCandidate := ""
+		selectedCandidateIndent := 0
 		if e.candidatemode && !e.keymode && len(e.candidates) > 0 {
 			sel := e.candidates[e.candidateidx%len(e.candidates)]
 			if !strings.HasSuffix(sel, "(") {
-				selectedCandidate = sel
-				// Auto-scroll so the highlighted key is visible when Tab/Shift+Tab was pressed.
-				if e.candidateScrollNeeded {
-					e.candidateScrollNeeded = false
-					_, h := termbox.Size()
-					if foundLine := findKeyLineInContents(contents, sel); foundLine >= 0 {
+				foundLine, foundIndent := findKeyLineInContents(contents, sel)
+				if foundLine >= 0 {
+					selectedCandidate = sel
+					selectedCandidateIndent = foundIndent
+					// Auto-scroll so the highlighted key is visible when Tab/Shift+Tab was pressed.
+					if e.candidateScrollNeeded {
+						_, h := termbox.Size()
 						visibleEnd := e.contentOffset + h - DefaultY
 						if foundLine < e.contentOffset || foundLine >= visibleEnd {
 							e.contentOffset = foundLine
 						}
 					}
 				}
-			} else {
-				e.candidateScrollNeeded = false
 			}
+			e.candidateScrollNeeded = false
 		} else {
 			e.candidateScrollNeeded = false
 		}
 
 		ta := &TerminalDrawAttributes{
-			Query:             e.query.StringGet(),
-			Contents:          contents,
-			CandidateIndex:    e.candidateidx,
-			ContentsOffsetY:   e.contentOffset,
-			Complete:          e.complete[0],
-			Candidates:        e.candidates,
-			CursorOffset:      e.query.IndexOffset(e.queryCursorIdx),
-			FuncHelp:          funcHelp,
-			PlaceholderStart:  e.placeholderStart,
-			PlaceholderLen:    e.placeholderLen,
-			SelectedCandidate: selectedCandidate,
+			Query:                  e.query.StringGet(),
+			Contents:               contents,
+			CandidateIndex:         e.candidateidx,
+			ContentsOffsetY:        e.contentOffset,
+			Complete:               e.complete[0],
+			Candidates:             e.candidates,
+			CursorOffset:           e.query.IndexOffset(e.queryCursorIdx),
+			FuncHelp:               funcHelp,
+			PlaceholderStart:       e.placeholderStart,
+			PlaceholderLen:         e.placeholderLen,
+			SelectedCandidate:      selectedCandidate,
+			SelectedCandidateIndent: selectedCandidateIndent,
 		}
 		err = e.term.Draw(ta)
 		if err != nil {
@@ -675,21 +677,34 @@ func (e *Engine) historyNext() {
 	e.queryCursorIdx = e.query.Length()
 }
 
-// findKeyLineInContents returns the first line index in contents where `key`
-// appears as a JSON object key (i.e. `"key":` pattern). Returns -1 if not found.
-func findKeyLineInContents(contents []string, key string) int {
+// findKeyLineInContents returns the line index and indentation (number of
+// leading spaces) of the first occurrence of `"key":` at the shallowest
+// nesting level in contents. Returns -1, 0 if not found.
+// Choosing the shallowest indent ensures nested keys with the same name are
+// not matched when the candidate belongs to the top level of the display.
+func findKeyLineInContents(contents []string, key string) (int, int) {
 	pattern := `"` + key + `"`
+	minIndent := -1
+	firstLine := -1
 	for i, row := range contents {
 		idx := strings.Index(row, pattern)
 		if idx < 0 {
 			continue
 		}
 		rest := strings.TrimLeft(row[idx+len(pattern):], " \t")
-		if strings.HasPrefix(rest, ":") {
-			return i
+		if !strings.HasPrefix(rest, ":") {
+			continue
+		}
+		indent := len(row) - len(strings.TrimLeft(row, " \t"))
+		if minIndent < 0 || indent < minIndent {
+			minIndent = indent
+			firstLine = i
 		}
 	}
-	return -1
+	if minIndent < 0 {
+		return -1, 0
+	}
+	return firstLine, minIndent
 }
 
 func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {

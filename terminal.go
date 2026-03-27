@@ -30,7 +30,8 @@ type TerminalDrawAttributes struct {
 	FuncHelp          string
 	PlaceholderStart  int // rune index in Query; -1 if no placeholder
 	PlaceholderLen    int
-	SelectedCandidate string // field name to highlight in JSON; "" if none
+	SelectedCandidate       string // field name to highlight in JSON; "" if none
+	SelectedCandidateIndent int    // indentation level of the target key
 }
 
 func NewTerminal(prompt string, defaultY int, monochrome bool) *Terminal {
@@ -82,7 +83,7 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 
 	if attr.SelectedCandidate != "" {
 		for i, row := range cellsArr {
-			cellsArr[i] = highlightCandidateKey(row, attr.SelectedCandidate)
+			cellsArr[i] = highlightCandidateKey(row, attr.SelectedCandidate, attr.SelectedCandidateIndent)
 		}
 	}
 
@@ -276,8 +277,10 @@ func (t *Terminal) drawFuncHelp(x int, y int, help string) {
 }
 
 // highlightCandidateKey highlights the JSON key matching `key` in a row of cells
-// by applying a yellow background. Returns the original slice if the key is not found.
-func highlightCandidateKey(cells []termbox.Cell, key string) []termbox.Cell {
+// by applying a yellow background, but only when the key's indentation equals
+// targetIndent. This prevents nested keys with the same name from being highlighted.
+// Returns the original slice if the key is not found or is at the wrong indent.
+func highlightCandidateKey(cells []termbox.Cell, key string, targetIndent int) []termbox.Cell {
 	var sb strings.Builder
 	for _, c := range cells {
 		sb.WriteRune(c.Ch)
@@ -291,6 +294,11 @@ func highlightCandidateKey(cells []termbox.Cell, key string) []termbox.Cell {
 	// Confirm it is a JSON key (followed by optional whitespace then ':')
 	rest := strings.TrimLeft(rowStr[idx+len(pattern):], " \t")
 	if !strings.HasPrefix(rest, ":") {
+		return cells
+	}
+	// Only highlight when the key is at the expected indentation level.
+	indent := len(rowStr) - len(strings.TrimLeft(rowStr, " \t"))
+	if indent != targetIndent {
 		return cells
 	}
 	result := make([]termbox.Cell, len(cells))

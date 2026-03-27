@@ -20,11 +20,9 @@ func makeCells(s string) []termbox.Cell {
 func TestHighlightCandidateKeyFound(t *testing.T) {
 	// Row: `  "name": "alice"`
 	// "name" starts at rune index 2, length 6 (including quotes).
-	row := `  "name": "alice"`
-	cells := makeCells(row)
-	result := highlightCandidateKey(cells, "name")
+	cells := makeCells(`  "name": "alice"`)
+	result := highlightCandidateKey(cells, "name", 2)
 
-	// Positions 2–7 (`"name"`) should be highlighted.
 	for i, c := range result {
 		if i >= 2 && i <= 7 {
 			assert.Equal(t, termbox.ColorYellow, c.Bg, "index %d should have yellow bg", i)
@@ -37,24 +35,46 @@ func TestHighlightCandidateKeyFound(t *testing.T) {
 
 func TestHighlightCandidateKeyNotFound(t *testing.T) {
 	cells := makeCells(`  "name": "alice"`)
-	result := highlightCandidateKey(cells, "missing")
-	// Slice is returned unmodified (same contents).
+	result := highlightCandidateKey(cells, "missing", 2)
 	assert.Equal(t, cells, result)
 }
 
 func TestHighlightCandidateKeyValueNotHighlighted(t *testing.T) {
 	// "name" appears only as a string value, not followed by ":"
 	cells := makeCells(`  "url": "name"`)
-	result := highlightCandidateKey(cells, "name")
+	result := highlightCandidateKey(cells, "name", 2)
 	for _, c := range result {
 		assert.Equal(t, termbox.ColorDefault, c.Bg, "value occurrence must not be highlighted")
+	}
+}
+
+func TestHighlightCandidateKeyWrongIndentNotHighlighted(t *testing.T) {
+	// Row has indent 8, but targetIndent is 2 → must not highlight.
+	cells := makeCells(`        "name": "overgrow"`)
+	result := highlightCandidateKey(cells, "name", 2)
+	for _, c := range result {
+		assert.Equal(t, termbox.ColorDefault, c.Bg, "wrong-indent occurrence must not be highlighted")
+	}
+}
+
+func TestHighlightCandidateKeyCorrectIndentHighlighted(t *testing.T) {
+	// Same key name, but this row has indent 2 matching targetIndent → highlight.
+	cells := makeCells(`  "name": "bulbasaur"`)
+	result := highlightCandidateKey(cells, "name", 2)
+	// Positions 2–7 (`"name"`) should be highlighted.
+	for i, c := range result {
+		if i >= 2 && i <= 7 {
+			assert.Equal(t, termbox.ColorYellow, c.Bg, "index %d should be highlighted", i)
+		} else {
+			assert.Equal(t, termbox.ColorDefault, c.Bg, "index %d should not be highlighted", i)
+		}
 	}
 }
 
 func TestHighlightCandidateKeyWithSpaceBeforeColon(t *testing.T) {
 	// Some formatters emit `"key" : value`
 	cells := makeCells(`  "age" : 30`)
-	result := highlightCandidateKey(cells, "age")
+	result := highlightCandidateKey(cells, "age", 2)
 	// "age" at positions 2–6 (5 chars including quotes)
 	for i, c := range result {
 		if i >= 2 && i <= 6 {
@@ -70,6 +90,6 @@ func TestHighlightCandidateKeyOriginalUnmodified(t *testing.T) {
 	cells := makeCells(`  "id": 1`)
 	orig := make([]termbox.Cell, len(cells))
 	copy(orig, cells)
-	highlightCandidateKey(cells, "id")
+	highlightCandidateKey(cells, "id", 2)
 	assert.Equal(t, orig, cells, "original cells slice must not be mutated")
 }

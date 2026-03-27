@@ -487,22 +487,50 @@ func TestFindKeyLineInContents(t *testing.T) {
 		`  "url": "https://example.com/name"`,
 		`}`,
 	}
-	assert.Equal(t, 1, findKeyLineInContents(contents, "name"))
-	assert.Equal(t, 2, findKeyLineInContents(contents, "age"))
-	// "name" appears in a string value on line 3, not as a key → should not match
-	assert.Equal(t, -1, findKeyLineInContents(contents, "missing"))
-	assert.Equal(t, -1, findKeyLineInContents(contents, "alice"))
+	line, indent := findKeyLineInContents(contents, "name")
+	assert.Equal(t, 1, line)
+	assert.Equal(t, 2, indent)
+
+	line, indent = findKeyLineInContents(contents, "age")
+	assert.Equal(t, 2, line)
+	assert.Equal(t, 2, indent)
+
+	// "name" in a value string is not a key
+	line, _ = findKeyLineInContents(contents, "missing")
+	assert.Equal(t, -1, line)
+	line, _ = findKeyLineInContents(contents, "alice")
+	assert.Equal(t, -1, line)
 }
 
 func TestFindKeyLineInContentsEmpty(t *testing.T) {
-	assert.Equal(t, -1, findKeyLineInContents([]string{}, "name"))
-	assert.Equal(t, -1, findKeyLineInContents([]string{"{", "}"}, "name"))
+	line, _ := findKeyLineInContents([]string{}, "name")
+	assert.Equal(t, -1, line)
+	line, _ = findKeyLineInContents([]string{"{", "}"}, "name")
+	assert.Equal(t, -1, line)
 }
 
 func TestFindKeyLineInContentsFirst(t *testing.T) {
-	// key on first line
 	contents := []string{`{"id": 1}`}
-	assert.Equal(t, 0, findKeyLineInContents(contents, "id"))
+	line, indent := findKeyLineInContents(contents, "id")
+	assert.Equal(t, 0, line)
+	assert.Equal(t, 0, indent)
+}
+
+func TestFindKeyLineInContentsShallowWins(t *testing.T) {
+	// "name" appears nested (indent 8) before the shallow occurrence (indent 2)
+	contents := []string{
+		`{`,
+		`  "abilities": [`,
+		`    {`,
+		`        "name": "overgrow"`,  // indent 8, nested
+		`    }`,
+		`  ],`,
+		`  "name": "bulbasaur"`,  // indent 2, root
+		`}`,
+	}
+	line, indent := findKeyLineInContents(contents, "name")
+	assert.Equal(t, 6, line)   // root-level line
+	assert.Equal(t, 2, indent) // shallowest indent
 }
 
 func getEngine(j string, qs string) *Engine {
