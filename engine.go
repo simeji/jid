@@ -48,6 +48,12 @@ type Engine struct {
 	// placeholder: ghost text at cursor position after function confirmation
 	placeholderStart int // rune index in query; -1 if inactive
 	placeholderLen   int
+	// history navigation
+	history    *History
+	historyTmp string // saves current input while browsing history
+	cfg        Config
+	// candidate key highlighting / auto-scroll
+	candidateScrollNeeded bool
 }
 
 type EngineAttribute struct {
@@ -75,7 +81,9 @@ func NewEngine(s io.Reader, ea *EngineAttribute) (EngineInterface, error) {
 		prettyResult:     ea.PrettyResult,
 		showFuncHelp:     true,
 		placeholderStart: -1,
+		cfg:              LoadConfig(),
 	}
+	e.history = NewHistory(e.cfg.HistoryPath(), e.cfg.History.MaxSize)
 	e.queryCursorIdx = e.query.Length()
 	return e, nil
 }
@@ -110,6 +118,7 @@ func (e *Engine) Run() EngineResultInterface {
 	defer termbox.Close()
 
 	var contents []string
+	actionMap := e.buildActionMap(&contents)
 
 	for {
 
@@ -133,17 +142,60 @@ func (e *Engine) Run() EngineResultInterface {
 				funcHelp = FunctionDescription(selected) + "  [Ctrl+X: hide]"
 			}
 		}
+
+		// Determine the selected field candidate (non-function) for JSON key highlighting.
+		selectedCandidate := ""
+		selectedCandidateIndent := 0
+		if e.candidatemode && !e.keymode && len(e.candidates) > 0 {
+			sel := e.candidates[e.candidateidx%len(e.candidates)]
+			if !strings.HasSuffix(sel, "(") {
+				foundLine, foundIndent := findKeyLineInContents(contents, sel)
+				if foundLine >= 0 {
+					selectedCandidate = sel
+					selectedCandidateIndent = foundIndent
+					// Auto-scroll so the highlighted key is visible when Tab/Shift+Tab was pressed.
+					if e.candidateScrollNeeded {
+						_, h := termbox.Size()
+						visibleEnd := e.contentOffset + h - DefaultY
+						if foundLine < e.contentOffset || foundLine >= visibleEnd {
+							e.contentOffset = foundLine
+						}
+					}
+				}
+			}
+			e.candidateScrollNeeded = false
+		} else if !e.candidatemode && !e.keymode && e.complete[0] != "" && e.complete[1] != "" {
+			// Typing narrows to a single suggestion (green hint shown) — highlight and
+			// auto-scroll immediately so the user can see where they are navigating.
+			keyName := e.complete[1]
+			foundLine, foundIndent := findKeyLineInContents(contents, keyName)
+			if foundLine >= 0 {
+				selectedCandidate = keyName
+				selectedCandidateIndent = foundIndent
+				_, h := termbox.Size()
+				visibleEnd := e.contentOffset + h - DefaultY
+				if foundLine < e.contentOffset || foundLine >= visibleEnd {
+					e.contentOffset = foundLine
+				}
+			}
+			e.candidateScrollNeeded = false
+		} else {
+			e.candidateScrollNeeded = false
+		}
+
 		ta := &TerminalDrawAttributes{
-			Query:            e.query.StringGet(),
-			Contents:         contents,
-			CandidateIndex:   e.candidateidx,
-			ContentsOffsetY:  e.contentOffset,
-			Complete:         e.complete[0],
-			Candidates:       e.candidates,
-			CursorOffset:     e.query.IndexOffset(e.queryCursorIdx),
-			FuncHelp:         funcHelp,
-			PlaceholderStart: e.placeholderStart,
-			PlaceholderLen:   e.placeholderLen,
+			Query:                  e.query.StringGet(),
+			Contents:               contents,
+			CandidateIndex:         e.candidateidx,
+			ContentsOffsetY:        e.contentOffset,
+			Complete:               e.complete[0],
+			Candidates:             e.candidates,
+			CursorOffset:           e.query.IndexOffset(e.queryCursorIdx),
+			FuncHelp:               funcHelp,
+			PlaceholderStart:       e.placeholderStart,
+			PlaceholderLen:         e.placeholderLen,
+			SelectedCandidate:      selectedCandidate,
+			SelectedCandidateIndent: selectedCandidateIndent,
 		}
 		err = e.term.Draw(ta)
 		if err != nil {
@@ -176,36 +228,19 @@ func (e *Engine) Run() EngineResultInterface {
 				}
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				e.deleteChar()
-			case termbox.KeyTab:
-				e.tabAction()
-			case termbox.KeyArrowLeft, termbox.KeyCtrlB:
+			case termbox.KeyArrowLeft:
 				e.moveCursorBackward()
-			case termbox.KeyArrowRight, termbox.KeyCtrlF:
+			case termbox.KeyArrowRight:
 				e.moveCursorForward()
-			case termbox.KeyHome, termbox.KeyCtrlA:
+			case termbox.KeyHome:
 				e.moveCursorToTop()
-			case termbox.KeyEnd, termbox.KeyCtrlE:
+			case termbox.KeyEnd:
 				e.moveCursorToEnd()
-			case termbox.KeyCtrlK:
-				e.scrollToAbove()
-			case termbox.KeyCtrlJ:
-				e.scrollToBelow()
-			case termbox.KeyCtrlG:
-				e.scrollToBottom(len(contents))
-			case termbox.KeyCtrlT:
-				e.scrollToTop()
-			case termbox.KeyCtrlN:
-				_, h := termbox.Size()
-				e.scrollPageDown(len(contents), h)
-			case termbox.KeyCtrlP:
-				_, h := termbox.Size()
-				e.scrollPageUp(h)
-			case termbox.KeyCtrlL:
-				e.toggleKeymode()
-			case termbox.KeyCtrlU:
-				e.deleteLineQuery()
-			case termbox.KeyCtrlW:
-				e.deleteWordBackward()
+			case termbox.KeyCtrlX:
+				if e.candidatemode && len(e.candidates) > 0 &&
+					strings.HasSuffix(e.candidates[0], "(") {
+					e.showFuncHelp = !e.showFuncHelp
+				}
 			case termbox.KeyEsc:
 				// Save candidate state in case this Esc is the start of Shift+Tab (\x1b[Z)
 				e.savedCandidates = e.candidates
@@ -223,6 +258,8 @@ func (e *Engine) Run() EngineResultInterface {
 					} else {
 						cc, _, _, err = e.manager.Get(e.query, true)
 					}
+					e.history.Add(e.query.StringGet())
+					_ = e.history.Save()
 
 					return &EngineResult{
 						content: cc,
@@ -231,14 +268,12 @@ func (e *Engine) Run() EngineResultInterface {
 					}
 				}
 				e.confirmCandidate()
-			case termbox.KeyCtrlX:
-				if e.candidatemode && len(e.candidates) > 0 &&
-					strings.HasSuffix(e.candidates[0], "(") {
-					e.showFuncHelp = !e.showFuncHelp
-				}
 			case termbox.KeyCtrlC:
 				return &EngineResult{}
 			default:
+				if fn, ok := actionMap[ev.Key]; ok {
+					fn()
+				}
 			}
 		case termbox.EventError:
 			panic(ev.Err)
@@ -351,6 +386,7 @@ func (e *Engine) confirmCandidate() {
 }
 
 func (e *Engine) deleteChar() {
+	e.history.ResetIdx()
 	e.clearPlaceholder()
 	if i := e.queryCursorIdx - 1; i > 0 {
 		_ = e.query.Delete(i)
@@ -359,6 +395,7 @@ func (e *Engine) deleteChar() {
 }
 
 func (e *Engine) deleteLineQuery() {
+	e.history.ResetIdx()
 	_ = e.query.StringSet("")
 	e.queryCursorIdx = 0
 }
@@ -517,6 +554,7 @@ func (e *Engine) tabAction() {
 		}
 		e.candidateidx = (e.candidateidx + 1) % len(e.candidates)
 		e.queryCursorIdx = e.query.Length()
+		e.candidateScrollNeeded = true
 		return
 	}
 	// Array index increment: query ends with [N], works in all contexts.
@@ -575,6 +613,7 @@ func (e *Engine) shiftTabAction() {
 			e.candidateidx--
 		}
 		e.queryCursorIdx = e.query.Length()
+		e.candidateScrollNeeded = true
 		return
 	}
 	e.changeArrayIndex(-1)
@@ -588,6 +627,7 @@ func (e *Engine) clearPlaceholder() {
 }
 
 func (e *Engine) inputChar(ch rune) {
+	e.history.ResetIdx()
 	if e.placeholderLen > 0 && e.queryCursorIdx == e.placeholderStart {
 		// Replace placeholder text with the typed character
 		for i := 0; i < e.placeholderLen; i++ {
@@ -631,4 +671,94 @@ func (e *Engine) moveCursorToTop() {
 func (e *Engine) moveCursorToEnd() {
 	e.clearPlaceholder()
 	e.queryCursorIdx = e.query.Length()
+}
+
+func (e *Engine) historyPrev() {
+	if e.history.AtEnd() {
+		e.historyTmp = e.query.StringGet()
+	}
+	if entry, ok := e.history.Prev(); ok {
+		_ = e.query.StringSet(entry)
+		e.queryCursorIdx = e.query.Length()
+	}
+}
+
+func (e *Engine) historyNext() {
+	if entry, ok := e.history.Next(); ok {
+		_ = e.query.StringSet(entry)
+	} else {
+		_ = e.query.StringSet(e.historyTmp)
+	}
+	e.queryCursorIdx = e.query.Length()
+}
+
+// findKeyLineInContents returns the line index and indentation (number of
+// leading spaces) of the first occurrence of `"key":` at the shallowest
+// nesting level in contents. Returns -1, 0 if not found.
+// Choosing the shallowest indent ensures nested keys with the same name are
+// not matched when the candidate belongs to the top level of the display.
+func findKeyLineInContents(contents []string, key string) (int, int) {
+	pattern := `"` + key + `"`
+	minIndent := -1
+	firstLine := -1
+	for i, row := range contents {
+		idx := strings.Index(row, pattern)
+		if idx < 0 {
+			continue
+		}
+		rest := strings.TrimLeft(row[idx+len(pattern):], " \t")
+		if !strings.HasPrefix(rest, ":") {
+			continue
+		}
+		indent := len(row) - len(strings.TrimLeft(row, " \t"))
+		if minIndent < 0 || indent < minIndent {
+			minIndent = indent
+			firstLine = i
+		}
+	}
+	if minIndent < 0 {
+		return -1, 0
+	}
+	return firstLine, minIndent
+}
+
+func (e *Engine) buildActionMap(contents *[]string) map[termbox.Key]func() {
+	kb := e.cfg.Keybindings
+	m := map[termbox.Key]func(){
+		resolveKey(kb.HistoryPrev, "up"):    e.historyPrev,
+		resolveKey(kb.HistoryNext, "down"):  e.historyNext,
+		resolveKey(kb.CursorLeft, "ctrl+b"): e.moveCursorBackward,
+		resolveKey(kb.CursorRight, "ctrl+f"): e.moveCursorForward,
+		resolveKey(kb.CursorToStart, "ctrl+a"): e.moveCursorToTop,
+		resolveKey(kb.CursorToEnd, "ctrl+e"):   e.moveCursorToEnd,
+		resolveKey(kb.ScrollDown, "ctrl+j"):     e.scrollToBelow,
+		resolveKey(kb.ScrollUp, "ctrl+k"):       e.scrollToAbove,
+		resolveKey(kb.ScrollToBottom, "ctrl+g"): func() { e.scrollToBottom(len(*contents)) },
+		resolveKey(kb.ScrollToTop, "ctrl+t"):    e.scrollToTop,
+		resolveKey(kb.ScrollPageDown, "ctrl+n"): func() {
+			_, h := termbox.Size()
+			e.scrollPageDown(len(*contents), h)
+		},
+		resolveKey(kb.ScrollPageUp, "ctrl+p"): func() {
+			_, h := termbox.Size()
+			e.scrollPageUp(h)
+		},
+		resolveKey(kb.ToggleKeymode, "ctrl+l"):  e.toggleKeymode,
+		resolveKey(kb.DeleteLine, "ctrl+u"):     e.deleteLineQuery,
+		resolveKey(kb.DeleteWord, "ctrl+w"):     e.deleteWordBackward,
+		resolveKey(kb.CandidateNext, "tab"): e.tabAction,
+		resolveKey(kb.ToggleFuncHelp, "ctrl+x"): func() {
+			if e.candidatemode && len(e.candidates) > 0 &&
+				strings.HasSuffix(e.candidates[0], "(") {
+				e.showFuncHelp = !e.showFuncHelp
+			}
+		},
+	}
+	// candidate_prev is optional; only add if configured
+	if kb.CandidatePrev != "" {
+		if k, ok := ParseKey(kb.CandidatePrev); ok {
+			m[k] = e.shiftTabAction
+		}
+	}
+	return m
 }

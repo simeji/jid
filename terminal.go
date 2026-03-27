@@ -20,16 +20,18 @@ type Terminal struct {
 }
 
 type TerminalDrawAttributes struct {
-	Query            string
-	Contents         []string
-	CandidateIndex   int
-	ContentsOffsetY  int
-	Complete         string
-	Candidates       []string
-	CursorOffset     int
-	FuncHelp         string
-	PlaceholderStart int // rune index in Query; -1 if no placeholder
-	PlaceholderLen   int
+	Query             string
+	Contents          []string
+	CandidateIndex    int
+	ContentsOffsetY   int
+	Complete          string
+	Candidates        []string
+	CursorOffset      int
+	FuncHelp          string
+	PlaceholderStart  int // rune index in Query; -1 if no placeholder
+	PlaceholderLen    int
+	SelectedCandidate       string // field name to highlight in JSON; "" if none
+	SelectedCandidateIndent int    // indentation level of the target key
 }
 
 func NewTerminal(prompt string, defaultY int, monochrome bool) *Terminal {
@@ -77,6 +79,12 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 	cellsArr, err := t.rowsToCells(rows)
 	if err != nil {
 		return err
+	}
+
+	if attr.SelectedCandidate != "" {
+		for i, row := range cellsArr {
+			cellsArr[i] = highlightCandidateKey(row, attr.SelectedCandidate, attr.SelectedCandidateIndent)
+		}
 	}
 
 	for idx, cells := range cellsArr {
@@ -266,6 +274,42 @@ func (t *Terminal) drawFuncHelp(x int, y int, help string) {
 		}
 		i += w
 	}
+}
+
+// highlightCandidateKey highlights the JSON key matching `key` in a row of cells
+// by applying a yellow background, but only when the key's indentation equals
+// targetIndent. This prevents nested keys with the same name from being highlighted.
+// Returns the original slice if the key is not found or is at the wrong indent.
+func highlightCandidateKey(cells []termbox.Cell, key string, targetIndent int) []termbox.Cell {
+	var sb strings.Builder
+	for _, c := range cells {
+		sb.WriteRune(c.Ch)
+	}
+	rowStr := sb.String()
+	pattern := `"` + key + `"`
+	idx := strings.Index(rowStr, pattern)
+	if idx < 0 {
+		return cells
+	}
+	// Confirm it is a JSON key (followed by optional whitespace then ':')
+	rest := strings.TrimLeft(rowStr[idx+len(pattern):], " \t")
+	if !strings.HasPrefix(rest, ":") {
+		return cells
+	}
+	// Only highlight when the key is at the expected indentation level.
+	indent := len(rowStr) - len(strings.TrimLeft(rowStr, " \t"))
+	if indent != targetIndent {
+		return cells
+	}
+	result := make([]termbox.Cell, len(cells))
+	copy(result, cells)
+	runeStart := len([]rune(rowStr[:idx]))
+	patternRuneLen := len([]rune(pattern))
+	for i := runeStart; i < runeStart+patternRuneLen && i < len(result); i++ {
+		result[i].Fg = termbox.ColorBlack
+		result[i].Bg = termbox.ColorYellow
+	}
+	return result
 }
 
 func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) int {

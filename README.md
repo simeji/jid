@@ -1,6 +1,8 @@
 # jid
 
-[![Circle CI](https://circleci.com/gh/simeji/jid/tree/master.svg?style=shield)](https://circleci.com/gh/simeji/jid/tree/master)
+[![Test](https://github.com/simeji/jid/actions/workflows/test.yml/badge.svg)](https://github.com/simeji/jid/actions/workflows/test.yml)
+
+<img src="https://github.com/user-attachments/assets/78b0ee4c-2171-4557-b690-50d503f91190" alt="jid logo" width="200" />
 
 Json Incremental Digger
 
@@ -11,7 +13,17 @@ You can drill down JSON interactively by using filtering queries like [jq](https
 
 ## Demo
 
-![demo-jid-main](https://github.com/simeji/jid/wiki/images/demo-jid-main-640-colorize.gif)
+### Drill-down navigation
+
+Interactively navigate JSON using dot-path queries. Tab-complete fields, cycle through candidates, and see the matching key highlighted in the JSON view in real time.
+
+![demo-jid-drilldown](https://github.com/user-attachments/assets/b37e5a62-e9e4-4ec5-9cc8-e4ca9180a744)
+
+### JMESPath expressions
+
+Use pipes, wildcards, and built-in functions directly in the filter. Function candidates are shown with usage hints and argument templates are filled in automatically.
+
+![demo-jid-jmespath](https://github.com/user-attachments/assets/d6cb5cc7-4e66-4b66-b7bb-c4cc50e8b050)
 
 ## Installation
 
@@ -101,7 +113,6 @@ Then, you press Enter key and output `[1,2]` and exit.
 
 #### simple json example2
 
-This json is used by [demo section](https://github.com/simeji/jid#demo).
 ```
 echo '{"info":{"date":"2016-10-23","version":1.0},"users":[{"name":"simeji","uri":"https://github.com/simeji","id":1},{"name":"simeji2","uri":"https://example.com/simeji","id":2},{"name":"simeji3","uri":"https://example.com/simeji3","id":3}],"userCount":3}}'|jid
 ```
@@ -131,7 +142,7 @@ jid < file.json
 
 |key|description|
 |:-----------|:----------|
-|`TAB` / `CTRL` + `I` |Show available items and choose them (cycles forward)|
+|`TAB` / `CTRL` + `I` |Show available items and choose them (cycles forward); highlights the matching key in the JSON view|
 |`Shift` + `TAB` |Cycle candidates backward / decrement array index|
 |`CTRL` + `W` |Delete one JMESPath segment backward (e.g. `.id` → `[0]` → `func(@)` → pipe)|
 |`CTRL` + `U` |Delete whole query|
@@ -148,6 +159,8 @@ jid < file.json
 |`CTRL` + `P`|Scroll json buffer 'Page Up'|
 |`CTRL` + `L`|Change view mode whole json or keys (only object)|
 |`ESC`|Hide a candidate box|
+|Up Arrow|Navigate to previous query in history|
+|Down Arrow|Navigate to next query in history|
 
 ### Option
 
@@ -159,6 +172,54 @@ jid < file.json
 |-version | print the version and exit|
 |-q | Output query mode (for jq)|
 |-M | monochrome output mode|
+
+## Configuration
+
+jid can be configured via a TOML file located at:
+
+| OS | Path |
+|:---|:-----|
+| macOS | `~/Library/Application Support/jid/config.toml` |
+| Linux | `~/.config/jid/config.toml` |
+| Windows | `%AppData%\jid\config.toml` |
+
+### Example config.toml
+
+```toml
+[history]
+path = "~/.jid_history"  # custom history file path
+max_size = 1000           # number of entries to keep
+
+[keybindings]
+history_prev    = "up"      # navigate to older query
+history_next    = "down"    # navigate to newer query
+scroll_down     = "ctrl+j"
+scroll_up       = "ctrl+k"
+scroll_to_bottom = "ctrl+g"
+scroll_to_top   = "ctrl+t"
+scroll_page_down = "ctrl+n"
+scroll_page_up  = "ctrl+p"
+toggle_keymode  = "ctrl+l"
+delete_line     = "ctrl+u"
+delete_word     = "ctrl+w"
+cursor_left     = "ctrl+b"
+cursor_right    = "ctrl+f"
+cursor_to_start = "ctrl+a"
+cursor_to_end   = "ctrl+e"
+toggle_func_help = "ctrl+x"
+candidate_next  = "tab"       # cycle candidates forward
+candidate_prev  = "ctrl+p"    # cycle candidates backward (additional key; Shift+Tab always works)
+```
+
+> **Note:** Shift+Tab (`\x1b[Z`) is a fixed terminal escape sequence and always triggers backward cycling regardless of `candidate_prev`.
+
+### Supported key strings
+
+`ctrl+a` … `ctrl+z`, `up`, `down`, `left`, `right`, `tab`, `enter`, `esc`, `backspace`, `home`, `end`, `pgup`, `pgdn`, `delete`, `f1` … `f12`
+
+### Query History
+
+Queries are saved automatically on Enter. The history file path follows the same OS convention as the config file (e.g. `~/Library/Application Support/jid/history` on macOS) unless overridden in `config.toml`.
 
 ## JMESPath Support
 
@@ -217,6 +278,15 @@ When you type `|` after a field, jid shows available JMESPath functions filtered
 | Number | `abs`, `ceil`, `floor`, `not_null`, `to_array`, `to_string`, `type` |
 
 A usage description is shown below the candidate list (toggle with `Ctrl+X`).
+
+### Candidate Key Highlighting
+
+The matching JSON key is highlighted in yellow and the view auto-scrolls to it in two situations:
+
+- **While typing** — as soon as the query narrows down to a single candidate (e.g. typing `.na` when only `name` matches), the corresponding key is highlighted immediately, before pressing `Tab`.
+- **While cycling with `Tab` / `Shift+Tab`** — the key for each selected candidate is highlighted as you cycle through the list.
+
+In both cases, if the key is outside the visible area the JSON view scrolls to bring it into view. Only the key at the correct nesting level is highlighted — nested keys with the same name are ignored.
 
 ### Function Argument Templates
 

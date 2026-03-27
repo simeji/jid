@@ -479,6 +479,94 @@ func TestTabActionJMESPath(t *testing.T) {
 	assert.Equal(".items[*].id[0]", e3.query.StringGet())
 }
 
+// TestGetContentsCompleteSingleMatch validates the preconditions for the
+// "highlight while typing" feature: when a partial query narrows candidates to
+// one, complete[1] holds the full key name and candidatemode is false.
+func TestGetContentsCompleteSingleMatch(t *testing.T) {
+	e := getEngine(`{"name":"alice","foo":"bar"}`, "")
+	e.query.StringSet(".na")
+	e.queryCursorIdx = e.query.Length()
+	e.getContents()
+	// complete[0] = suffix to display in green ("me"), complete[1] = full key ("name")
+	assert.Equal(t, "me", e.complete[0])
+	assert.Equal(t, "name", e.complete[1])
+	// candidatemode must be false so the "typing hint" branch activates
+	e.setCandidateData()
+	assert.False(t, e.candidatemode)
+}
+
+// TestGetContentsCompleteMultiMatch confirms that with multiple matches
+// complete[1] is the common-prefix partial (not a real key), so
+// findKeyLineInContents will return -1 and no highlighting is triggered.
+func TestGetContentsCompleteMultiMatch(t *testing.T) {
+	e := getEngine(`{"name":"alice","naming":"bob","foo":"bar"}`, "")
+	e.query.StringSet(".na")
+	e.queryCursorIdx = e.query.Length()
+	e.getContents()
+	// common suffix "m"; complete[1]="nam" is a partial prefix, not a real key
+	assert.Equal(t, "m", e.complete[0])
+	assert.Equal(t, "nam", e.complete[1])
+	assert.Equal(t, []string{"name", "naming"}, e.candidates)
+	// "nam" is not a real JSON key → no highlight line found
+	contents := []string{`{`, `  "name": "alice",`, `  "naming": "bob"`, `}`}
+	line, _ := findKeyLineInContents(contents, e.complete[1])
+	assert.Equal(t, -1, line)
+}
+
+func TestFindKeyLineInContents(t *testing.T) {
+	contents := []string{
+		`{`,
+		`  "name": "alice",`,
+		`  "age": 30,`,
+		`  "url": "https://example.com/name"`,
+		`}`,
+	}
+	line, indent := findKeyLineInContents(contents, "name")
+	assert.Equal(t, 1, line)
+	assert.Equal(t, 2, indent)
+
+	line, indent = findKeyLineInContents(contents, "age")
+	assert.Equal(t, 2, line)
+	assert.Equal(t, 2, indent)
+
+	// "name" in a value string is not a key
+	line, _ = findKeyLineInContents(contents, "missing")
+	assert.Equal(t, -1, line)
+	line, _ = findKeyLineInContents(contents, "alice")
+	assert.Equal(t, -1, line)
+}
+
+func TestFindKeyLineInContentsEmpty(t *testing.T) {
+	line, _ := findKeyLineInContents([]string{}, "name")
+	assert.Equal(t, -1, line)
+	line, _ = findKeyLineInContents([]string{"{", "}"}, "name")
+	assert.Equal(t, -1, line)
+}
+
+func TestFindKeyLineInContentsFirst(t *testing.T) {
+	contents := []string{`{"id": 1}`}
+	line, indent := findKeyLineInContents(contents, "id")
+	assert.Equal(t, 0, line)
+	assert.Equal(t, 0, indent)
+}
+
+func TestFindKeyLineInContentsShallowWins(t *testing.T) {
+	// "name" appears nested (indent 8) before the shallow occurrence (indent 2)
+	contents := []string{
+		`{`,
+		`  "abilities": [`,
+		`    {`,
+		`        "name": "overgrow"`,  // indent 8, nested
+		`    }`,
+		`  ],`,
+		`  "name": "bulbasaur"`,  // indent 2, root
+		`}`,
+	}
+	line, indent := findKeyLineInContents(contents, "name")
+	assert.Equal(t, 6, line)   // root-level line
+	assert.Equal(t, 2, indent) // shallowest indent
+}
+
 func getEngine(j string, qs string) *Engine {
 	r := bytes.NewBufferString(j)
 	e, _ := NewEngine(r, &EngineAttribute{
