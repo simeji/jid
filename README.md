@@ -122,7 +122,7 @@ echo '{"info":{"date":"2016-10-23","version":1.0},"users":[{"name":"simeji","uri
 First argument of `jid` is initial query.
 (Use JSON same as [Demo](#demo))
 
-![demo-jid-with-query](https://github.com/simeji/jid/wiki/images/demo-jid-with-query-640.gif)
+![demo-jid-with-query](https://github.com/user-attachments/assets/d4ef1067-ccd1-401d-8cc3-eef4eef96109)
 
 #### with curl
 
