@@ -7,10 +7,13 @@ import (
 	"strings"
 
 	simplejson "github.com/bitly/go-simplejson"
+	jsoniter "github.com/json-iterator/go"
 	jmespath "github.com/jmespath/go-jmespath"
 	"github.com/pkg/errors"
 	"io"
 )
+
+var fastjson = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type JsonManager struct {
 	current    *simplejson.Json
@@ -48,10 +51,9 @@ func NewJsonManager(reader io.Reader) (*JsonManager, error) {
 }
 
 func (jm *JsonManager) Get(q QueryInterface, confirm bool) (string, []string, []string, error) {
-	json, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
+	j, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
 
-	data, enc_err := json.Encode()
-
+	data, enc_err := fastjson.Marshal(j.Interface())
 	if enc_err != nil {
 		return "", []string{"", ""}, []string{"", ""}, errors.Wrap(enc_err, "failure json encode")
 	}
@@ -60,8 +62,8 @@ func (jm *JsonManager) Get(q QueryInterface, confirm bool) (string, []string, []
 }
 
 func (jm *JsonManager) GetPretty(q QueryInterface, confirm bool) (string, []string, []string, error) {
-	json, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
-	s, err := json.EncodePretty()
+	j, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
+	s, err := fastjson.MarshalIndent(j.Interface(), "", "  ")
 	if err != nil {
 		return "", []string{"", ""}, []string{"", ""}, errors.Wrap(err, "failure json encode")
 	}
