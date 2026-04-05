@@ -1,0 +1,39 @@
+remote_theme: "mmistakes/minimal-mistakes@4.26.2"
+plugins:
+  - jekyll-include-cache
+  - jekyll-feed
+
+title: "jid"
+subtitle: "JSON Incremental Digger"
+description: "Interactively drill down JSON with JMESPath support, query history, and key highlighting."
+url: "https://simeji.github.io"
+baseurl: "/jid"
+logo: "https://github.com/user-attachments/assets/78b0ee4c-2171-4557-b690-50d503f91190"
+repository: "simeji/jid"
+
+author:
+  name: "simeji"
+  uri: "https://github.com/simeji"
+  github: "simeji"
+
+minimal_mistakes_skin: "dark"
+
+permalink: /:categories/:title/
+paginate: 5
+
+include:
+  - _pages
+
+defaults:
+  - scope:
+      path: ""
+      type: pages
+    values:
+      layout: single
+      author_profile: false
+
+footer:
+  links:
+    - label: "GitHub"
+      icon: "fab fa-fw fa-github"
+      url: "https://github.com/simeji/jid"
