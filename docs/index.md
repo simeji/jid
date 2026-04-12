@@ -7,8 +7,8 @@ header:
   actions:
     - label: "GitHub"
       url: "https://github.com/simeji/jid"
-    - label: "Download v1.1.1"
-      url: "https://github.com/simeji/jid/releases/tag/v1.1.1"
+    - label: "Download v1.1.2"
+      url: "https://github.com/simeji/jid/releases/tag/v1.1.2"
 excerpt: >
   Interactively drill down JSON in your terminal.
   JMESPath support, query history, key highlighting, and more.
@@ -138,5 +138,5 @@ scroll_up    = "ctrl+k"
 
 <div style="text-align:center; margin-top: 2em;">
   <a href="https://github.com/simeji/jid" class="btn btn--primary btn--large">View on GitHub</a>
-  <a href="https://github.com/simeji/jid/releases/tag/v1.1.1" class="btn btn--inverse btn--large">Download v1.1.1</a>
+  <a href="https://github.com/simeji/jid/releases/tag/v1.1.2" class="btn btn--inverse btn--large">Download v1.1.2</a>
 </div>

@@ -1,7 +1,7 @@
 ChangeLog
 =======
 
-### 1.2.0 - Apr 2026
+### 1.1.2 - Apr 2026
 
 Features:
 * `&field` candidate completion inside function arguments: when a function template
