@@ -375,6 +375,8 @@ func TestRemoveLastJMESPathSegment(t *testing.T) {
 	assert.Equal("max_by(@, &", removeLastJMESPathSegment("max_by(@, &base_stat)"))
 	assert.Equal("sort_by(@, &", removeLastJMESPathSegment("sort_by(@, &name)"))
 	assert.Equal("sort_by(@, &", removeLastJMESPathSegment("sort_by(@, &)"))
+	// & inside a string literal must NOT trigger the &-stop rule
+	assert.Equal("", removeLastJMESPathSegment("contains(@, 'a&b')"))
 }
 
 func TestDeleteWordBackwardJMESPath(t *testing.T) {

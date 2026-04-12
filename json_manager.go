@@ -392,7 +392,9 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 		}
 		// Null result: may be &partial with a non-existent field (e.g. max_by(@, &field)).
 		// Detect &partial pattern and show field candidates instead.
-		if result.Interface() == nil {
+		// Skip this fallback when confirm=true so that a confirmed expression that
+		// genuinely returns null (e.g. max_by(@, &missing)) produces null output.
+		if result.Interface() == nil && !confirm {
 			if baseExpr2, hasPipe2 := baseExprBeforePipe(qs); hasPipe2 {
 				suffix2 := pipeSuffix(qs)
 				if partial, ok := ampFieldPartial(suffix2); ok {
@@ -408,7 +410,14 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 		return result, []string{"", ""}, []string{}, nil
 	}
 
-	// Expression is incomplete (parse error). Check whether the user is typing after a pipe.
+	// Expression is incomplete (parse error).
+	// When confirming (user pressed Enter), do not fall back to base-result recovery;
+	// return the error so the caller can display it correctly.
+	if confirm {
+		return jm.origin, []string{"", ""}, []string{}, err
+	}
+
+	// Check whether the user is typing after a pipe.
 	baseExpr, hasPipe := baseExprBeforePipe(qs)
 	suffix := pipeSuffix(qs)
 
@@ -445,8 +454,11 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 			}
 		}
 		// Detect &partial pattern in function argument (e.g. "sort_by(@, &ba").
-		if partial, ok := ampFieldPartial(suffix); ok {
-			return jm.ampFieldCandidates(baseExpr, partial)
+		// Skip when confirm=true so that a confirmed query returns its actual result.
+		if !confirm {
+			if partial, ok := ampFieldPartial(suffix); ok {
+				return jm.ampFieldCandidates(baseExpr, partial)
+			}
 		}
 
 		// Provide function-name candidates matching the typed suffix.

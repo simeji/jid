@@ -741,6 +741,12 @@ func TestGetFilteredDataJMESPathAmpField(t *testing.T) {
 	assert.Nil(err)
 	d, _ := result.Encode()
 	assert.Contains(string(d), "alice") // age 30 → max
+
+	// confirm=true with a missing field → JMESPath returns an error (cannot compare
+	// null values), NOT the base array that the suggestion fallback would return.
+	q = NewQueryWithString(". | max_by(@, &missing)")
+	_, _, _, err = jm.GetFilteredData(q, true)
+	assert.NotNil(err, "confirm=true should propagate the JMESPath error, not silently return base array")
 }
 
 func TestIsEmptyJson(t *testing.T) {

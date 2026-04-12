@@ -380,9 +380,11 @@ func (e *Engine) confirmCandidate() {
 		qs := e.query.StringGet()
 		if pipeIdx := strings.LastIndex(qs, "|"); pipeIdx >= 0 {
 			suffix := strings.TrimLeft(qs[pipeIdx+1:], " ")
-			if ampIdx := strings.LastIndex(suffix, "&"); ampIdx >= 0 && strings.Contains(suffix, "(") {
-				// &field typing inside function argument (e.g. "sort_by(@, &na)").
+			if _, ok := ampFieldPartial(suffix); ok {
+				// Active &partial editing inside a function argument (e.g. "sort_by(@, &na)").
 				// Replace everything after the last "&" with the selected field name.
+				// Use ampFieldPartial to guard against matching an already-completed
+				// expression that happens to contain "&" (e.g. "max_by(@, &age).field").
 				absAmpIdx := strings.LastIndex(qs, "&")
 				_ = e.query.StringSet(qs[:absAmpIdx+1] + selected + ")")
 				e.queryCursorIdx = e.query.Length()
@@ -484,8 +486,25 @@ func removeLastJMESPathSegment(expr string) string {
 	}
 	parenDepth := 0
 	bracketDepth := 0
+	inString := false
+	stringChar := byte(0)
 	for i := len(expr) - 1; i >= 0; i-- {
-		switch expr[i] {
+		c := expr[i]
+		// Track string literal boundaries (scan right-to-left: opening quote = exit,
+		// closing quote = enter). Single quotes only — JMESPath uses '' for literals.
+		if c == '\'' || c == '"' {
+			if inString && c == stringChar {
+				inString = false
+			} else if !inString {
+				inString = true
+				stringChar = c
+			}
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch c {
 		case ')':
 			parenDepth++
 		case '(':
@@ -502,7 +521,8 @@ func removeLastJMESPathSegment(expr string) string {
 				return expr[:i]
 			}
 		case '&':
-			// Inside a function call: "&field)" is one deletion unit; keep the "&".
+			// Inside a function call (not inside a string literal):
+			// "&field)" is one deletion unit; keep the "&".
 			// e.g. "max_by(@, &base_stat)" → "max_by(@, &"
 			if parenDepth > 0 && bracketDepth == 0 {
 				return expr[:i+1]
