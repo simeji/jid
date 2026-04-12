@@ -82,49 +82,78 @@ $ jid < file.json
 ============ With a JSON filter mode =============
 
 TAB / CTRL-I
-  Show available items and choice them
+  Show available candidates and cycle forward.
+  In JMESPath pipe mode, shows field or function candidates.
+  Confirms immediately when only one candidate matches.
+
+Shift-TAB
+  Cycle candidates backward.
+  Outside candidate mode: decrement the last array index.
+
+Enter
+  Exit jid and print the current result.
+  If a candidate list is open, confirm the selected candidate instead.
+  Set exit_on_enter = false in config.toml to disable accidental exit.
 
 CTRL-W
-  Delete from the cursor to the start of the word
+  Delete one segment backward (JMESPath-aware).
+  Removes the last field/index/function one step at a time.
+  Inside &field) argument: deletes the field name but keeps '&'.
 
 CTRL-U
-  Delete whole query
+  Delete whole query.
+
+CTRL-X
+  Toggle function description display (visible when function candidates are shown).
 
 CTRL-F / Right Arrow
-  Move cursor a character to the right
+  Move cursor a character to the right.
 
 CTRL-B / Left Arrow
-  Move cursor a character to the left
+  Move cursor a character to the left.
 
 CTRL-A
-  To the first character of the 'Filter'
+  Move cursor to the first character of the Filter.
 
 CTRL-E
-  To the end of the 'Filter'
+  Move cursor to the end of the Filter.
 
 CTRL-J
-  Scroll json buffer 1 line downwards
+  Scroll json buffer 1 line downwards.
 
 CTRL-K
-  Scroll json buffer 1 line upwards
+  Scroll json buffer 1 line upwards.
 
 CTRL-G
-  Scroll json buffer to bottom
+  Scroll json buffer to bottom.
 
 CTRL-T
-  Scroll json buffer to top
+  Scroll json buffer to top.
 
 CTRL-N
-  Scroll json buffer 'Page Down'
+  Scroll json buffer Page Down.
 
 CTRL-P
-  Scroll json buffer 'Page Up'
+  Scroll json buffer Page Up.
 
 CTRL-L
-  Change view mode whole json or keys (only object)
+  Toggle view mode: full JSON or keys-only (objects only).
 
 ESC
-  Hide a candidate box
+  Hide the candidate list.
+
+Up Arrow
+  Navigate to the previous query in history.
+
+Down Arrow
+  Navigate to the next query in history.
+
+============ JMESPath examples =============
+
+.users[*].name             wildcard: extract name from every user
+. | keys(@)                pipe + function: list root keys
+.users | sort_by(@, &name) sort array of objects by field
+.users | length(@)         pipe + function: count elements
 
 `
 }

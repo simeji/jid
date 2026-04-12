@@ -230,6 +230,59 @@ func isFunctionTypingMode(qs string) bool {
 	return !strings.Contains(suffix, "(")
 }
 
+// ampFieldCandidates returns the base result with field candidates for &partial completion.
+func (jm *JsonManager) ampFieldCandidates(baseExpr, partial string) (*simplejson.Json, []string, []string, error) {
+	var baseResult *simplejson.Json
+	if baseExpr == "@" {
+		baseResult = jm.origin
+	} else {
+		var berr error
+		baseResult, berr = jm.evalBaseExpr(baseExpr)
+		if berr != nil {
+			baseResult = jm.origin
+		}
+	}
+	// For array base, use first element's keys
+	el := baseResult
+	if arr, arrErr := baseResult.Array(); arrErr == nil && len(arr) > 0 {
+		el = baseResult.GetIndex(0)
+	}
+	fieldCandidates := jm.suggestion.GetCandidateKeys(el, partial)
+	// If no candidates match (e.g. partial is placeholder text like "field"),
+	// fall back to showing all keys.
+	if len(fieldCandidates) == 0 {
+		fieldCandidates = jm.suggestion.GetCandidateKeys(el, "")
+	}
+	// Don't emit a green inline hint: the cursor sits inside "&partial)" so any
+	// suffix hint would appear after ")" and confuse the display. The candidate
+	// list already shows all options.
+	return baseResult, []string{"", ""}, fieldCandidates, nil
+}
+
+// ampFieldPartial detects when the user is typing a field name after `&` inside
+// a function argument (e.g. "sort_by(@, &na" → partial="na", ok=true).
+// Returns the partial identifier and true if the pattern is detected.
+func ampFieldPartial(suffix string) (string, bool) {
+	parenIdx := strings.Index(suffix, "(")
+	if parenIdx < 0 {
+		return "", false
+	}
+	ampIdx := strings.LastIndex(suffix, "&")
+	if ampIdx < 0 || ampIdx < parenIdx {
+		return "", false
+	}
+	partial := suffix[ampIdx+1:]
+	// Strip trailing ) which may be present when the function template is already inserted
+	partial = strings.TrimRight(partial, ")")
+	// partial must contain only identifier characters (letters, digits, underscore)
+	for _, ch := range partial {
+		if ch != '_' && !('a' <= ch && ch <= 'z') && !('A' <= ch && ch <= 'Z') && !('0' <= ch && ch <= '9') {
+			return "", false
+		}
+	}
+	return partial, true
+}
+
 // getFilteredDataJMESPath handles queries that contain JMESPath-specific syntax.
 func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simplejson.Json, []string, []string, error) {
 	expr := jmespathExprFromQuery(qs)
@@ -337,6 +390,16 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 			suggest := jm.suggestion.Get(result, "")
 			return result, suggest, []string{}, nil
 		}
+		// Null result: may be &partial with a non-existent field (e.g. max_by(@, &field)).
+		// Detect &partial pattern and show field candidates instead.
+		if result.Interface() == nil {
+			if baseExpr2, hasPipe2 := baseExprBeforePipe(qs); hasPipe2 {
+				suffix2 := pipeSuffix(qs)
+				if partial, ok := ampFieldPartial(suffix2); ok {
+					return jm.ampFieldCandidates(baseExpr2, partial)
+				}
+			}
+		}
 		// Map (object) result: suggest field keys so the user can keep digging.
 		if candidateKeys := getCurrentKeys(result); len(candidateKeys) > 0 {
 			fieldSuggest := jm.suggestion.Get(result, "")
@@ -381,6 +444,11 @@ func (jm *JsonManager) getFilteredDataJMESPath(qs string, confirm bool) (*simple
 				baseResult = jm.origin
 			}
 		}
+		// Detect &partial pattern in function argument (e.g. "sort_by(@, &ba").
+		if partial, ok := ampFieldPartial(suffix); ok {
+			return jm.ampFieldCandidates(baseExpr, partial)
+		}
+
 		// Provide function-name candidates matching the typed suffix.
 		baseType := jm.suggestion.GetCurrentType(baseResult)
 		fnCandidates := jm.suggestion.GetFunctionCandidatesFiltered(suffix, baseType)

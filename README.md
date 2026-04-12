@@ -315,9 +315,27 @@ When a function candidate is confirmed, the arguments are automatically filled i
 | `join` | `join('', @)` | inside `''` (separator) |
 | `sort_by` | `sort_by(@, &field)` | on `field` placeholder |
 | `max_by` | `max_by(@, &field)` | on `field` placeholder |
+| `min_by` | `min_by(@, &field)` | on `field` placeholder |
 | `map` | `map(&expr, @)` | on `expr` placeholder |
 
-Placeholder text is shown in blue. Typing any character replaces the entire placeholder.
+Placeholder text is shown in cyan. Typing any character replaces the entire placeholder.
+
+#### `&field` Candidate Completion
+
+For functions that take a `&field` argument (`sort_by`, `max_by`, `min_by`, `map`),
+jid automatically shows the available field names from the base array as soon as the
+`&field` template is inserted:
+
+```
+.stats | sort_by(@, &field)   →  field names shown: base_stat  effort  stat
+.stats | sort_by(@, &b        →  filtered: base_stat
+.stats | sort_by(@, &base_stat)  →  confirmed; expression evaluates normally
+```
+
+- **Tab / Shift+Tab** cycles through field candidates; cursor stays between `&` and `)`
+- **Typing** filters candidates by the partial name after `&`
+- **Enter** or **Tab** (when only one candidate) confirms the selection
+- **Ctrl+W** deletes the field name but keeps `&` (e.g. `&base_stat)` → `&`)
 
 ### Wildcard Projection Navigation
 
@@ -340,4 +358,11 @@ After a wildcard expression like `.game_indices[*]`, jid shows the field names o
 .[3] | to_array(@)[0]     →(Ctrl+W)→  .[3] | to_array(@)
 .[3] | to_array(@)        →(Ctrl+W)→  .[3] |
 .[3] |                    →(Ctrl+W)→  .[3]
+```
+
+Inside a function call, the `&field` argument is treated as one unit and `&` is preserved:
+
+```
+.stats | max_by(@, &base_stat)  →(Ctrl+W)→  .stats | max_by(@, &
+.stats | max_by(@, &            →(Ctrl+W)→  .stats |
 ```

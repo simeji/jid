@@ -651,6 +651,98 @@ func TestGetFilteredDataJMESPathObjectResult(t *testing.T) {
 	assert.Contains(candidates, "id")
 }
 
+func TestAmpFieldPartial(t *testing.T) {
+	// basic: "&field)" inside function call
+	partial, ok := ampFieldPartial("sort_by(@, &field)")
+	assert.True(t, ok)
+	assert.Equal(t, "field", partial)
+
+	// partial identifier, no closing paren
+	partial, ok = ampFieldPartial("sort_by(@, &na")
+	assert.True(t, ok)
+	assert.Equal(t, "na", partial)
+
+	// empty partial (just "&)")
+	partial, ok = ampFieldPartial("max_by(@, &)")
+	assert.True(t, ok)
+	assert.Equal(t, "", partial)
+
+	// empty partial (just "&" with no closing paren)
+	partial, ok = ampFieldPartial("max_by(@, &")
+	assert.True(t, ok)
+	assert.Equal(t, "", partial)
+
+	// no "(" → not in function call
+	_, ok = ampFieldPartial("&field")
+	assert.False(t, ok)
+
+	// "&" before "(" → not after open-paren
+	_, ok = ampFieldPartial("&max_by(@, field)")
+	assert.False(t, ok)
+
+	// no "&" at all
+	_, ok = ampFieldPartial("sort_by(@, name)")
+	assert.False(t, ok)
+
+	// identifier with underscore and digits
+	partial, ok = ampFieldPartial("sort_by(@, &base_stat2)")
+	assert.True(t, ok)
+	assert.Equal(t, "base_stat2", partial)
+}
+
+func TestAmpFieldCandidates(t *testing.T) {
+	data := `[{"name":"alice","age":30},{"name":"bob","age":25}]`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// empty partial → all keys; no inline hint (["",""])
+	_, suggest, candidates, err := jm.ampFieldCandidates("@", "")
+	assert.Nil(t, err)
+	assert.Contains(t, candidates, "name")
+	assert.Contains(t, candidates, "age")
+	assert.Equal(t, []string{"", ""}, suggest)
+
+	// partial "na" → only "name"; still no inline hint
+	_, suggest, candidates, err = jm.ampFieldCandidates("@", "na")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"name"}, candidates)
+	assert.Equal(t, []string{"", ""}, suggest)
+
+	// placeholder text "field" → no match → fall back to all keys; no inline hint
+	_, suggest, candidates, err = jm.ampFieldCandidates("@", "field")
+	assert.Nil(t, err)
+	assert.Contains(t, candidates, "name")
+	assert.Contains(t, candidates, "age")
+	assert.Equal(t, []string{"", ""}, suggest)
+}
+
+func TestGetFilteredDataJMESPathAmpField(t *testing.T) {
+	assert := assert.New(t)
+	data := `[{"name":"alice","age":30},{"name":"bob","age":25}]`
+	r := bytes.NewBufferString(data)
+	jm, _ := NewJsonManager(r)
+
+	// "&field)" placeholder → all field candidates from array elements
+	q := NewQueryWithString(". | max_by(@, &field)")
+	_, _, candidates, err := jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	assert.Contains(candidates, "name")
+	assert.Contains(candidates, "age")
+
+	// "&na" partial (no closing paren) → "name" candidate
+	q = NewQueryWithString(". | max_by(@, &na")
+	_, _, candidates, err = jm.GetFilteredData(q, false)
+	assert.Nil(err)
+	assert.Contains(candidates, "name")
+
+	// confirmed expression → evaluates normally, no amp-field candidates
+	q = NewQueryWithString(". | max_by(@, &age)")
+	result, _, _, err := jm.GetFilteredData(q, true)
+	assert.Nil(err)
+	d, _ := result.Encode()
+	assert.Contains(string(d), "alice") // age 30 → max
+}
+
 func TestIsEmptyJson(t *testing.T) {
 	var assert = assert.New(t)
 	r := bytes.NewBufferString(`{"name":"go"}`)
