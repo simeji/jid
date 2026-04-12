@@ -130,7 +130,7 @@ func (t *Terminal) drawFilterLine(qs string, complete string, phStart int, phLen
 			c = termbox.ColorGreen
 		}
 		if phByteStart >= 0 && i >= phByteStart && i < phByteEnd {
-			c = termbox.ColorBlue
+			c = termbox.ColorCyan
 		}
 		cells = append(cells, termbox.Cell{
 			Ch: s,

@@ -371,8 +371,12 @@ func TestRemoveLastJMESPathSegment(t *testing.T) {
 	assert.Equal("", removeLastJMESPathSegment("foo"))
 	assert.Equal("foo", removeLastJMESPathSegment("foo[0]"))
 	assert.Equal("foo.bar[1]", removeLastJMESPathSegment("foo.bar[1].baz"))
-	// dots inside parens are not treated as separators
-	assert.Equal("", removeLastJMESPathSegment("sort_by(@, &name)"))
+	// &field) inside a function call is one deletion unit; & is kept
+	assert.Equal("max_by(@, &", removeLastJMESPathSegment("max_by(@, &base_stat)"))
+	assert.Equal("sort_by(@, &", removeLastJMESPathSegment("sort_by(@, &name)"))
+	assert.Equal("sort_by(@, &", removeLastJMESPathSegment("sort_by(@, &)"))
+	// & inside a string literal must NOT trigger the &-stop rule
+	assert.Equal("", removeLastJMESPathSegment("contains(@, 'a&b')"))
 }
 
 func TestDeleteWordBackwardJMESPath(t *testing.T) {
@@ -402,6 +406,12 @@ func TestDeleteWordBackwardJMESPath(t *testing.T) {
 
 	e.deleteWordBackward()
 	assert.Equal(".", e.query.StringGet())
+
+	// &field) argument deletion: & is preserved
+	e.query.StringSet(".stats | max_by(@, &base_stat)")
+	e.queryCursorIdx = e.query.Length()
+	e.deleteWordBackward()
+	assert.Equal(".stats | max_by(@, &", e.query.StringGet())
 }
 
 func TestConfirmCandidateJMESPath(t *testing.T) {
@@ -565,6 +575,65 @@ func TestFindKeyLineInContentsShallowWins(t *testing.T) {
 	line, indent := findKeyLineInContents(contents, "name")
 	assert.Equal(t, 6, line)   // root-level line
 	assert.Equal(t, 2, indent) // shallowest indent
+}
+
+func TestAmpFieldCursorPos(t *testing.T) {
+	e := getEngine(`[{"name":"alice","age":30}]`, "")
+
+	// &partial) mode: cursor should land right after &
+	e.query.StringSet(". | max_by(@, &)")
+	pos := e.ampFieldCursorPos(e.query.StringGet())
+	// ". | max_by(@, &" has 15 runes (& at index 14), so cursor = 15
+	assert.Equal(t, 15, pos)
+
+	// with partial typed: cursor stays right after & (index 15 as well)
+	e.query.StringSet(". | max_by(@, &base_stat)")
+	pos = e.ampFieldCursorPos(e.query.StringGet())
+	assert.Equal(t, 15, pos)
+
+	// no & in query: fall back to query.Length()
+	e.query.StringSet(". | keys(@)")
+	pos = e.ampFieldCursorPos(e.query.StringGet())
+	assert.Equal(t, e.query.Length(), pos)
+
+	// no pipe: fall back to query.Length()
+	e.query.StringSet(".name")
+	pos = e.ampFieldCursorPos(e.query.StringGet())
+	assert.Equal(t, e.query.Length(), pos)
+}
+
+// TestSetCandidateDataAmpFieldCursorPosition verifies that when &field placeholder
+// text is deleted from the query, the cursor is placed at placeholderStart (between
+// '&' and ')'), NOT at the end of the query string.
+func TestSetCandidateDataAmpFieldCursorPosition(t *testing.T) {
+	// JSON: array of objects, query has "&field)" placeholder inside a pipe expression
+	e := getEngine(`[{"name":"alice","age":30}]`, "")
+	// Simulate the state after sort_by(@, &field) was auto-inserted:
+	//   query = ". | sort_by(@, &field)"
+	//   placeholderStart = index of 'f' in "field" = 16 (". | sort_by(@, &" is 16 runes)
+	//   placeholderLen   = 5 ("field")
+	e.query.StringSet(". | sort_by(@, &field)")
+	// placeholderStart is the rune index of the first char of "field"
+	// ". | sort_by(@, &" has 17 chars (indices 0..16), so "field" starts at 17
+	phStart := len([]rune(". | sort_by(@, &"))
+	e.placeholderStart = phStart
+	e.placeholderLen = 5 // len("field")
+	e.queryCursorIdx = phStart
+
+	// Force the candidates that setCandidateData will see (simulates what
+	// getContents() would produce for this query)
+	e.candidates = []string{"age", "name"}
+	e.complete = []string{"", "age"}
+
+	e.setCandidateData()
+
+	// After deletion: query becomes ". | sort_by(@, &)" (field removed)
+	assert.Equal(t, ". | sort_by(@, &)", e.query.StringGet())
+	// Cursor should be at placeholderStart (between '&' and ')'), not at the end
+	assert.Equal(t, phStart, e.queryCursorIdx)
+	// Placeholder must be cleared
+	assert.Equal(t, -1, e.placeholderStart)
+	assert.Equal(t, 0, e.placeholderLen)
 }
 
 func getEngine(j string, qs string) *Engine {

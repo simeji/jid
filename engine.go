@@ -327,6 +327,15 @@ func (e *Engine) setCandidateData() {
 	if isFuncCandidates || isJMESPathFieldCandidates {
 		// Auto-enter candidate mode so the list appears without a Tab press.
 		e.candidatemode = true
+		// When entering &field candidate mode, remove the placeholder text from the
+		// query string (e.g. "field" in "&field)") so the user sees just "&".
+		if isJMESPathFieldCandidates && strings.Contains(qs0, "&") && e.placeholderStart >= 0 && e.placeholderLen > 0 {
+			for i := 0; i < e.placeholderLen; i++ {
+				_ = e.query.Delete(e.placeholderStart)
+			}
+			e.queryCursorIdx = e.placeholderStart
+			e.clearPlaceholder()
+		}
 		if e.candidateidx >= l {
 			e.candidateidx = 0
 		}
@@ -371,7 +380,16 @@ func (e *Engine) confirmCandidate() {
 		qs := e.query.StringGet()
 		if pipeIdx := strings.LastIndex(qs, "|"); pipeIdx >= 0 {
 			suffix := strings.TrimLeft(qs[pipeIdx+1:], " ")
-			if strings.Contains(suffix, "(") {
+			if _, ok := ampFieldPartial(suffix); ok {
+				// Active &partial editing inside a function argument (e.g. "sort_by(@, &na)").
+				// Replace everything after the last "&" with the selected field name.
+				// Use ampFieldPartial to guard against matching an already-completed
+				// expression that happens to contain "&" (e.g. "max_by(@, &age).field").
+				absAmpIdx := strings.LastIndex(qs, "&")
+				_ = e.query.StringSet(qs[:absAmpIdx+1] + selected + ")")
+				e.queryCursorIdx = e.query.Length()
+				e.clearPlaceholder()
+			} else if strings.Contains(suffix, "(") {
 				// The pipe suffix is a complete expression (e.g. "to_array(@)[0]").
 				// Append .field to the full query rather than stripping back to the base.
 				// If query already ends with "." don't add another.
@@ -458,17 +476,35 @@ func (e *Engine) toggleKeymode() {
 }
 // removeLastJMESPathSegment removes the last navigation segment from a
 // JMESPath expression suffix, working backwards:
-//   "to_array(@)[0].id"  → "to_array(@)[0]"  (remove .field)
-//   "to_array(@)[0]"     → "to_array(@)"      (remove [index])
-//   "to_array(@)"        → ""                 (remove function call)
+//   "to_array(@)[0].id"        → "to_array(@)[0]"  (remove .field)
+//   "to_array(@)[0]"           → "to_array(@)"      (remove [index])
+//   "to_array(@)"              → ""                 (remove function call)
+//   "max_by(@, &base_stat)"    → "max_by(@, "       (remove &field) argument)
 func removeLastJMESPathSegment(expr string) string {
 	if expr == "" {
 		return ""
 	}
 	parenDepth := 0
 	bracketDepth := 0
+	inString := false
+	stringChar := byte(0)
 	for i := len(expr) - 1; i >= 0; i-- {
-		switch expr[i] {
+		c := expr[i]
+		// Track string literal boundaries (scan right-to-left: opening quote = exit,
+		// closing quote = enter). Single quotes only — JMESPath uses '' for literals.
+		if c == '\'' || c == '"' {
+			if inString && c == stringChar {
+				inString = false
+			} else if !inString {
+				inString = true
+				stringChar = c
+			}
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch c {
 		case ')':
 			parenDepth++
 		case '(':
@@ -483,6 +519,13 @@ func removeLastJMESPathSegment(expr string) string {
 		case '.':
 			if parenDepth == 0 && bracketDepth == 0 {
 				return expr[:i]
+			}
+		case '&':
+			// Inside a function call (not inside a string literal):
+			// "&field)" is one deletion unit; keep the "&".
+			// e.g. "max_by(@, &base_stat)" → "max_by(@, &"
+			if parenDepth > 0 && bracketDepth == 0 {
+				return expr[:i+1]
 			}
 		}
 	}
@@ -572,7 +615,7 @@ func (e *Engine) tabAction() {
 			return
 		}
 		e.candidateidx = (e.candidateidx + 1) % len(e.candidates)
-		e.queryCursorIdx = e.query.Length()
+		e.queryCursorIdx = e.ampFieldCursorPos(qs)
 		e.candidateScrollNeeded = true
 		return
 	}
@@ -631,12 +674,29 @@ func (e *Engine) shiftTabAction() {
 		} else {
 			e.candidateidx--
 		}
-		e.queryCursorIdx = e.query.Length()
+		e.queryCursorIdx = e.ampFieldCursorPos(e.query.StringGet())
 		e.candidateScrollNeeded = true
 		return
 	}
 	e.changeArrayIndex(-1)
 }
+// ampFieldCursorPos returns the cursor position to use while cycling candidates
+// in &partial mode. When the query contains "&" inside a function call (e.g.
+// "max_by(@, &)"), the cursor should sit right after "&" (between "&" and ")"),
+// not at the end of the query. Otherwise returns query.Length().
+func (e *Engine) ampFieldCursorPos(qs string) int {
+	if pipeIdx := strings.LastIndex(qs, "|"); pipeIdx >= 0 {
+		suffix := strings.TrimLeft(qs[pipeIdx+1:], " ")
+		if _, ok := ampFieldPartial(suffix); ok {
+			ampIdx := strings.LastIndex(qs, "&")
+			if ampIdx >= 0 {
+				return len([]rune(qs[:ampIdx+1]))
+			}
+		}
+	}
+	return e.query.Length()
+}
+
 func (e *Engine) setQuitRequested() {
 	e.quitRequested = true
 }

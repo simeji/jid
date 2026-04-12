@@ -1,6 +1,19 @@
 ChangeLog
 =======
 
+### 1.1.2 - Apr 2026
+
+Features:
+* `&field` candidate completion inside function arguments: when a function template
+  inserts a `&field` placeholder (e.g. `sort_by(@, &field)`), field candidates from
+  the base array are automatically shown so the user can Tab-cycle or type to filter
+* Placeholder text is removed immediately on entering candidate mode; cursor is placed
+  between `&` and `)` for clean inline editing
+* `Ctrl+W` now treats `&field)` as one deletion unit and stops at `&`, preserving it
+  (e.g. `max_by(@, &base_stat)` → `max_by(@, &`)
+* Suppressed misleading green hint in `&partial` mode (hint appeared after `)`)
+* Cursor stays between `&` and `)` while Tab-cycling field candidates
+
 ### 1.1.1 - Mar 28 2026
 
 Features:
