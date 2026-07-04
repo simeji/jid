@@ -183,7 +183,7 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 			suggestion = suggestion[0 : max+1]
 		}
 	}
-	if reg, err := regexp.Compile("(?i)^" + keyword); err == nil {
+	if reg, err := compileCached("(?i)^" + keyword); err == nil {
 		completion = reg.ReplaceAllString(suggestion, "")
 	}
 	return []string{completion, suggestion}
@@ -200,7 +200,7 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 		return getCurrentKeys(json)
 	}
 
-	reg, err := regexp.Compile(`(?i)^(\\")?` + keyword + `(\\")?`)
+	reg, err := compileCached(`(?i)^(\\")?` + keyword + `(\\")?`)
 	if err != nil {
 		return []string{}
 	}
@@ -294,7 +294,7 @@ func (s *Suggestion) GetFunctionCandidatesFiltered(prefix string, t SuggestionDa
 		}
 		return out
 	}
-	reg, err := regexp.Compile(`(?i)^` + regexp.QuoteMeta(prefix))
+	reg, err := compileCached(`(?i)^` + regexp.QuoteMeta(prefix))
 	if err != nil {
 		return []string{}
 	}
@@ -347,7 +347,7 @@ func (s *Suggestion) GetFunctionSuggestionFiltered(prefix string, t SuggestionDa
 		return []string{"", ""}
 	}
 	// completion is the remaining characters after what has been typed
-	reg, err := regexp.Compile(`(?i)^` + regexp.QuoteMeta(prefix))
+	reg, err := compileCached(`(?i)^` + regexp.QuoteMeta(prefix))
 	if err != nil {
 		return []string{"", ""}
 	}

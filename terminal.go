@@ -3,7 +3,6 @@ package jid
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	runewidth "github.com/mattn/go-runewidth"
@@ -319,7 +318,9 @@ func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) 
 	w, _ := termbox.Size()
 
 	ss := candidates[index]
-	re := regexp.MustCompile("[[:space:]]" + regexp.QuoteMeta(ss) + "[[:space:]]")
+	// Rows are built below with plain " " separators, so matching the selected
+	// candidate surrounded by spaces needs no regex.
+	needle := " " + ss + " "
 
 	var rows []string
 	var str string
@@ -334,7 +335,10 @@ func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) 
 	rows = append(rows, str+" ")
 
 	for i, row := range rows {
-		match := re.FindStringIndex(row)
+		var match []int
+		if idx := strings.Index(row, needle); idx >= 0 {
+			match = []int{idx, idx + len(needle)}
+		}
 		var c termbox.Attribute
 		ii := 0
 		for k, s := range row {

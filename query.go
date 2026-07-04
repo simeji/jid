@@ -217,7 +217,7 @@ func (q *Query) PopKeyword() ([]rune, []rune) {
 			break
 		}
 	}
-	re := regexp.MustCompile(`(\.)?(\\")?` + regexp.QuoteMeta(nq) + "$")
+	re := mustCompileCached(`(\.)?(\\")?` + regexp.QuoteMeta(nq) + "$")
 
 	qq = re.ReplaceAllString(qq, "")
 
