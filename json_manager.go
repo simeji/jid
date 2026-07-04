@@ -23,11 +23,49 @@ var (
 	reArrayIndex        = regexp.MustCompile(`\[([0-9]+)\]`)
 )
 
+// fdKey identifies one GetFilteredData computation. origin/originData are
+// write-once (set in NewJsonManager), so results are pure functions of this key.
+type fdKey struct {
+	qs      string
+	confirm bool
+}
+
+// fdResult caches one GetFilteredData result. The cached json is only ever
+// read (Array/Map/GetIndex/Interface) and the slices are only reassigned,
+// never mutated in place, by all callers — so returning the same values
+// repeatedly is safe.
+type fdResult struct {
+	json       *simplejson.Json
+	suggestion []string
+	candidates []string
+	err        error
+}
+
+type evalEntry struct {
+	json *simplejson.Json
+	err  error
+}
+
+// evalCacheMax bounds the per-keystroke JMESPath evaluation cache; when
+// exceeded the whole map is dropped and rebuilt.
+const evalCacheMax = 64
+
 type JsonManager struct {
 	current    *simplejson.Json
 	origin     *simplejson.Json
 	originData interface{}
 	suggestion *Suggestion
+	// Single-entry memo for GetFilteredData/GetPretty. The TUI calls them
+	// once per frame with an unchanged query while scrolling or cycling
+	// candidates. Single-goroutine access only (termbox event loop).
+	lastFDKey     fdKey
+	lastFD        *fdResult // nil = no cached entry
+	lastPretty    string    // MarshalIndent output for lastFDKey
+	lastPrettyErr error
+	lastPrettyOK  bool
+	// evalCache memoizes evalJMESPath results: one keystroke can evaluate
+	// the same expression several times (base expr, rewrites, suggestions).
+	evalCache map[string]evalEntry
 }
 
 func NewJsonManager(reader io.Reader) (*JsonManager, error) {
@@ -70,10 +108,24 @@ func (jm *JsonManager) Get(q QueryInterface, confirm bool) (string, []string, []
 }
 
 func (jm *JsonManager) GetPretty(q QueryInterface, confirm bool) (string, []string, []string, error) {
+	key := fdKey{q.StringGet(), confirm}
 	j, suggestion, candidates, _ := jm.GetFilteredData(q, confirm)
+	if jm.lastPrettyOK && jm.lastFDKey == key {
+		if jm.lastPrettyErr != nil {
+			return "", []string{"", ""}, []string{"", ""}, jm.lastPrettyErr
+		}
+		return jm.lastPretty, suggestion, candidates, nil
+	}
 	s, err := fastjson.MarshalIndent(j.Interface(), "", "  ")
 	if err != nil {
-		return "", []string{"", ""}, []string{"", ""}, errors.Wrap(err, "failure json encode")
+		wrapped := errors.Wrap(err, "failure json encode")
+		if jm.lastFD != nil && jm.lastFDKey == key {
+			jm.lastPretty, jm.lastPrettyErr, jm.lastPrettyOK = "", wrapped, true
+		}
+		return "", []string{"", ""}, []string{"", ""}, wrapped
+	}
+	if jm.lastFD != nil && jm.lastFDKey == key {
+		jm.lastPretty, jm.lastPrettyErr, jm.lastPrettyOK = string(s), nil, true
 	}
 	return string(s), suggestion, candidates, nil
 }
@@ -132,6 +184,23 @@ func jmespathExprFromQuery(qs string) string {
 // evalJMESPath evaluates a JMESPath expression against the raw JSON data and
 // returns the result as a *simplejson.Json.
 func (jm *JsonManager) evalJMESPath(expr string) (*simplejson.Json, error) {
+	if e, ok := jm.evalCache[expr]; ok {
+		return e.json, e.err
+	}
+	j, err := jm.evalJMESPathUncached(expr)
+	// Errors are cached too: evaluation is deterministic on the immutable
+	// originData. Drop the whole map when it grows past the bound.
+	if len(jm.evalCache) >= evalCacheMax {
+		jm.evalCache = nil
+	}
+	if jm.evalCache == nil {
+		jm.evalCache = make(map[string]evalEntry)
+	}
+	jm.evalCache[expr] = evalEntry{j, err}
+	return j, err
+}
+
+func (jm *JsonManager) evalJMESPathUncached(expr string) (*simplejson.Json, error) {
 	result, err := jmespath.Search(expr, jm.originData)
 	if err != nil {
 		return nil, err
@@ -217,11 +286,20 @@ func pipeSuffix(qs string) string {
 func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplejson.Json, []string, []string, error) {
 	qs := q.StringGet()
 
-	if isJMESPathQuery(qs) {
-		return jm.getFilteredDataJMESPath(qs, confirm)
+	key := fdKey{qs, confirm}
+	if jm.lastFD != nil && jm.lastFDKey == key {
+		r := jm.lastFD
+		return r.json, r.suggestion, r.candidates, r.err
 	}
 
-	return jm.getFilteredDataLegacy(q, confirm)
+	var r fdResult
+	if isJMESPathQuery(qs) {
+		r.json, r.suggestion, r.candidates, r.err = jm.getFilteredDataJMESPath(qs, confirm)
+	} else {
+		r.json, r.suggestion, r.candidates, r.err = jm.getFilteredDataLegacy(q, confirm)
+	}
+	jm.lastFDKey, jm.lastFD, jm.lastPrettyOK = key, &r, false
+	return r.json, r.suggestion, r.candidates, r.err
 }
 
 // isFunctionTypingMode returns true when the user appears to be mid-typing a
