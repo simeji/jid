@@ -17,6 +17,13 @@ type Terminal struct {
 	formatter  *jsoncolor.Formatter
 	monochrome bool
 	outputArea *[][]termbox.Cell
+	// Formatted-cell cache: colorizing the whole document dominates frame
+	// cost, and scrolling / candidate cycling redraws identical content.
+	// Rows in lastCells are never mutated (highlightCandidateKey is
+	// copy-on-write), so only the outer slice needs copying per frame.
+	lastCellsKey string
+	lastCells    [][]termbox.Cell
+	lastCellsOK  bool
 }
 
 type TerminalDrawAttributes struct {
@@ -228,6 +235,11 @@ func (t *Terminal) rowsToCells(rows []string, raw string) ([][]termbox.Cell, err
 	if raw == "" {
 		raw = strings.Join(rows, "\n")
 	}
+	if t.lastCellsOK && raw == t.lastCellsKey {
+		// The caller replaces rows with highlighted copies, so hand out a
+		// fresh outer slice; the row slices themselves are read-only.
+		return append([][]termbox.Cell(nil), t.lastCells...), nil
+	}
 
 	*t.outputArea = [][]termbox.Cell{{}}
 
@@ -253,6 +265,10 @@ func (t *Terminal) rowsToCells(rows []string, raw string) ([][]termbox.Cell, err
 			cells = append(cells, cls)
 		}
 	}
+
+	t.lastCellsKey = raw
+	t.lastCells = append([][]termbox.Cell(nil), cells...)
+	t.lastCellsOK = true
 
 	return cells, nil
 }
