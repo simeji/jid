@@ -302,15 +302,15 @@ func (e *Engine) Run() EngineResultInterface {
 }
 
 func (e *Engine) getContents() []string {
-	var c string
-	var contents []string
-	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
 	if e.keymode {
-		contents = e.candidates
-	} else {
-		contents = strings.Split(c, "\n")
+		// Key mode only displays the candidates; skip pretty-printing the
+		// filtered JSON (its output was discarded here anyway).
+		_, e.complete, e.candidates, _ = e.manager.GetFilteredData(e.query, e.queryConfirm)
+		return e.candidates
 	}
-	return contents
+	var c string
+	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+	return strings.Split(c, "\n")
 }
 
 func (e *Engine) setCandidateData() {
