@@ -213,31 +213,24 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 }
 
 func getCurrentKeys(json *simplejson.Json) []string {
-
-	kk := []string{}
 	m, err := json.Map()
 
 	if err != nil {
-		return kk
+		return []string{}
 	}
+	kk := make([]string, 0, len(m))
 	for k := range m {
 		kk = append(kk, k)
 	}
+	// Sort raw keys first, then escape in place: candidate ordering is
+	// defined on the unescaped key names.
 	sort.Strings(kk)
-
-	keys := []string{}
-	for _, k := range kk {
+	for i, k := range kk {
 		if strings.Contains(k, ".") {
-			var sb strings.Builder
-			sb.Grow(len(k) + 4)
-			sb.WriteString(`\"`)
-			sb.WriteString(k)
-			sb.WriteString(`\"`)
-			k = sb.String()
+			kk[i] = `\"` + k + `\"`
 		}
-		keys = append(keys, k)
 	}
-	return keys
+	return kk
 }
 
 // jmespathFunctionsByType maps the primary input type to the subset of functions

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode/utf8"
 
 	runewidth "github.com/mattn/go-runewidth"
 	termbox "github.com/nsf/termbox-go"
@@ -19,16 +20,19 @@ type Terminal struct {
 }
 
 type TerminalDrawAttributes struct {
-	Query             string
-	Contents          []string
-	CandidateIndex    int
-	ContentsOffsetY   int
-	Complete          string
-	Candidates        []string
-	CursorOffset      int
-	FuncHelp          string
-	PlaceholderStart  int // rune index in Query; -1 if no placeholder
-	PlaceholderLen    int
+	Query    string
+	Contents []string
+	// ContentsRaw, when non-empty, is the exact string Contents was split
+	// from — lets rowsToCells skip re-joining the rows.
+	ContentsRaw             string
+	CandidateIndex          int
+	ContentsOffsetY         int
+	Complete                string
+	Candidates              []string
+	CursorOffset            int
+	FuncHelp                string
+	PlaceholderStart        int // rune index in Query; -1 if no placeholder
+	PlaceholderLen          int
 	SelectedCandidate       string // field name to highlight in JSON; "" if none
 	SelectedCandidateIndent int    // indentation level of the target key
 }
@@ -75,7 +79,7 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 		y++
 	}
 
-	cellsArr, err := t.rowsToCells(rows)
+	cellsArr, err := t.rowsToCells(rows, attr.ContentsRaw)
 	if err != nil {
 		return err
 	}
@@ -218,21 +222,27 @@ func (t *Terminal) initColorizeFormatter() *jsoncolor.Formatter {
 	return formatter
 }
 
-func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
-	*t.outputArea = [][]termbox.Cell{[]termbox.Cell{}}
+// rowsToCells converts display rows to termbox cells. raw, when non-empty,
+// must equal strings.Join(rows, "\n") and avoids rebuilding that string.
+func (t *Terminal) rowsToCells(rows []string, raw string) ([][]termbox.Cell, error) {
+	if raw == "" {
+		raw = strings.Join(rows, "\n")
+	}
+
+	*t.outputArea = [][]termbox.Cell{{}}
 
 	var err error
 
 	if t.formatter != nil {
-		err = t.formatter.Format(io.Discard, []byte(strings.Join(rows, "\n")))
+		err = t.formatter.Format(io.Discard, []byte(raw))
 	}
 
 	cells := *t.outputArea
 
 	if err != nil || t.monochrome {
-		cells = [][]termbox.Cell{}
+		cells = make([][]termbox.Cell, 0, len(rows))
 		for _, row := range rows {
-			var cls []termbox.Cell
+			cls := make([]termbox.Cell, 0, len(row))
 			for _, char := range row {
 				cls = append(cls, termbox.Cell{
 					Ch: char,
@@ -281,6 +291,7 @@ func (t *Terminal) drawFuncHelp(x int, y int, help string) {
 // Returns the original slice if the key is not found or is at the wrong indent.
 func highlightCandidateKey(cells []termbox.Cell, key string, targetIndent int) []termbox.Cell {
 	var sb strings.Builder
+	sb.Grow(len(cells))
 	for _, c := range cells {
 		sb.WriteRune(c.Ch)
 	}
@@ -302,8 +313,8 @@ func highlightCandidateKey(cells []termbox.Cell, key string, targetIndent int) [
 	}
 	result := make([]termbox.Cell, len(cells))
 	copy(result, cells)
-	runeStart := len([]rune(rowStr[:idx]))
-	patternRuneLen := len([]rune(pattern))
+	runeStart := utf8.RuneCountInString(rowStr[:idx])
+	patternRuneLen := utf8.RuneCountInString(pattern)
 	for i := runeStart; i < runeStart+patternRuneLen && i < len(result); i++ {
 		result[i].Fg = termbox.ColorBlack
 		result[i].Bg = termbox.ColorYellow

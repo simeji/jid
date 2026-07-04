@@ -183,7 +183,7 @@ func BenchmarkRowsToCellsColor(b *testing.B) {
 	term := NewTerminal(FilterPrompt, DefaultY, false)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := term.rowsToCells(rows); err != nil {
+		if _, err := term.rowsToCells(rows, ""); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -194,7 +194,7 @@ func BenchmarkRowsToCellsMono(b *testing.B) {
 	term := NewTerminal(FilterPrompt, DefaultY, true)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := term.rowsToCells(rows); err != nil {
+		if _, err := term.rowsToCells(rows, ""); err != nil {
 			b.Fatal(err)
 		}
 	}
