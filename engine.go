@@ -296,7 +296,6 @@ func (e *Engine) Run() EngineResultInterface {
 			}
 		case termbox.EventError:
 			panic(ev.Err)
-			break
 		default:
 		}
 	}
