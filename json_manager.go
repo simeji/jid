@@ -65,6 +65,9 @@ type JsonManager struct {
 	lastPrettyOK  bool
 	// evalCache memoizes evalJMESPath results: one keystroke can evaluate
 	// the same expression several times (base expr, rewrites, suggestions).
+	// Scoped to a single GetFilteredData computation — cleared on every
+	// cache miss there — so result trees don't outlive the frame that
+	// produced them.
 	evalCache map[string]evalEntry
 }
 
@@ -291,6 +294,11 @@ func (jm *JsonManager) GetFilteredData(q QueryInterface, confirm bool) (*simplej
 		r := jm.lastFD
 		return r.json, r.suggestion, r.candidates, r.err
 	}
+
+	// The query changed: release eval results kept for the previous one.
+	// All evalJMESPath calls happen inside the computation below, so this
+	// keeps the cache scoped to deduplicating within one filtering pass.
+	jm.evalCache = nil
 
 	var r fdResult
 	if isJMESPathQuery(qs) {
