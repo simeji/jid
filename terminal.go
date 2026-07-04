@@ -287,20 +287,6 @@ func (t *Terminal) drawCells(x int, y int, cells []termbox.Cell) {
 	}
 }
 
-func (t *Terminal) drawFuncHelp(x int, y int, help string) {
-	fg := termbox.ColorYellow
-	bg := termbox.ColorDefault
-	i := 0
-	for _, ch := range help {
-		termbox.SetCell(x+i, y, ch, fg, bg)
-		w := runewidth.RuneWidth(ch)
-		if w == 0 || w == 2 && runewidth.IsAmbiguousWidth(ch) {
-			w = 1
-		}
-		i += w
-	}
-}
-
 // highlightCandidateKey highlights the JSON key matching `key` in a row of cells
 // by applying a yellow background, but only when the key's indentation equals
 // targetIndent. This prevents nested keys with the same name from being highlighted.

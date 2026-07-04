@@ -748,10 +748,6 @@ func (e *Engine) moveCursorForward() {
 	}
 }
 
-func (e *Engine) moveCursorWordBackwark() {
-}
-func (e *Engine) moveCursorWordForward() {
-}
 func (e *Engine) moveCursorToTop() {
 	e.clearPlaceholder()
 	e.queryCursorIdx = 0
