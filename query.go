@@ -7,6 +7,19 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 )
 
+// Hot-path regexes, compiled once at package init. validate() and
+// GetKeywords() run on every keystroke.
+var (
+	reKeywordBracket      = regexp.MustCompile(`\[[0-9]*\]?`)
+	reValNoLeadingDot     = regexp.MustCompile(`^[^.]`)
+	reValPipeExpr         = regexp.MustCompile(`\|\s*\S`)
+	reValWildcardOrFilter = regexp.MustCompile(`\[\*\]|\[\?`)
+	reValMultiDot         = regexp.MustCompile(`\.{2,}`)
+	reValBadAfterIndex    = regexp.MustCompile(`\[[0-9]*\][^\.\[| ]`)
+	reValDoubleBracket    = regexp.MustCompile(`\[{2,}|\]{2,}`)
+	reValDotBracket       = regexp.MustCompile(`[^|]\.\[`)
+)
+
 type QueryInterface interface {
 	Get() []rune
 	Set(query []rune) []rune
@@ -164,8 +177,7 @@ func (q *Query) GetKeywords() [][]rune {
 	keywords := [][]rune{}
 	for i, keyword := range splitQuery {
 		if keyword != "" || i == lastIdx {
-			re := regexp.MustCompile(`\[[0-9]*\]?`)
-			matchIndexes := re.FindAllStringIndex(keyword, -1)
+			matchIndexes := reKeywordBracket.FindAllStringIndex(keyword, -1)
 			if len(matchIndexes) < 1 {
 				keywords = append(keywords, []rune(keyword))
 			} else {
@@ -243,27 +255,27 @@ func validate(r []rune) bool {
 	if s == "" {
 		return true
 	}
-	if regexp.MustCompile(`^[^.]`).MatchString(s) {
+	if reValNoLeadingDot.MatchString(s) {
 		return false
 	}
 	// Allow JMESPath pipe expressions: `. | func()`
-	if regexp.MustCompile(`\|\s*\S`).MatchString(s) {
+	if reValPipeExpr.MatchString(s) {
 		return true
 	}
 	// Allow JMESPath wildcards and filter expressions
-	if regexp.MustCompile(`\[\*\]|\[\?`).MatchString(s) {
+	if reValWildcardOrFilter.MatchString(s) {
 		return true
 	}
-	if regexp.MustCompile(`\.{2,}`).MatchString(s) {
+	if reValMultiDot.MatchString(s) {
 		return false
 	}
-	if regexp.MustCompile(`\[[0-9]*\][^\.\[| ]`).MatchString(s) {
+	if reValBadAfterIndex.MatchString(s) {
 		return false
 	}
-	if regexp.MustCompile(`\[{2,}|\]{2,}`).MatchString(s) {
+	if reValDoubleBracket.MatchString(s) {
 		return false
 	}
-	if regexp.MustCompile(`[^|]\.\[`).MatchString(s) {
+	if reValDotBracket.MatchString(s) {
 		return false
 	}
 	return true

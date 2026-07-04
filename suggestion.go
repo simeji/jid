@@ -8,6 +8,10 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 )
 
+// reIndexKeyword matches an array-index keyword like "[0]", "[", or "[]".
+// Compiled once at package init; Suggestion.Get runs on every keystroke.
+var reIndexKeyword = regexp.MustCompile(`\[([0-9]+)?\]?`)
+
 type SuggestionInterface interface {
 	Get(json *simplejson.Json, keyword string) []string
 	GetCandidateKeys(json *simplejson.Json, keyword string) []string
@@ -135,7 +139,7 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 
 	if a, err := json.Array(); err == nil {
 		if len(a) > 1 {
-			kw := regexp.MustCompile(`\[([0-9]+)?\]?`).FindString(keyword)
+			kw := reIndexKeyword.FindString(keyword)
 			if kw == "" {
 				return []string{"[", "["}
 			} else if kw == "[" {

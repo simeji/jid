@@ -15,6 +15,14 @@ import (
 
 var fastjson = jsoniter.ConfigCompatibleWithStandardLibrary
 
+// Hot-path regexes, compiled once at package init. These run on every
+// keystroke via isJMESPathQuery / getFilteredDataLegacy / getItem.
+var (
+	reJMESFuncCall      = regexp.MustCompile(`[a-z_]+\(`)
+	reOpenBracketSuffix = regexp.MustCompile(`\[[0-9]*$`)
+	reArrayIndex        = regexp.MustCompile(`\[([0-9]+)\]`)
+)
+
 type JsonManager struct {
 	current    *simplejson.Json
 	origin     *simplejson.Json
@@ -81,7 +89,7 @@ func isJMESPathQuery(qs string) bool {
 		return true
 	}
 	// wildcard array projection [*] or .*
-	if regexp.MustCompile(`\[\*\]|\.\*`).MatchString(inner) {
+	if strings.Contains(inner, "[*]") || strings.Contains(inner, ".*") {
 		return true
 	}
 	// filter expression [?
@@ -89,7 +97,7 @@ func isJMESPathQuery(qs string) bool {
 		return true
 	}
 	// function call: word(
-	if regexp.MustCompile(`[a-z_]+\(`).MatchString(inner) {
+	if reJMESFuncCall.MatchString(inner) {
 		return true
 	}
 	// multi-select hash or bare @ reference
@@ -510,12 +518,10 @@ func (jm *JsonManager) getFilteredDataLegacy(q QueryInterface, confirm bool) (*s
 	for _, keyword := range keywords[0:idx] {
 		json, _ = getItem(json, keyword)
 	}
-	reg := regexp.MustCompile(`\[[0-9]*$`)
-
 	suggest := jm.suggestion.Get(json, lastKeyword)
 	candidateKeys := jm.suggestion.GetCandidateKeys(json, lastKeyword)
 	// hash
-	if len(reg.FindString(lastKeyword)) < 1 {
+	if len(reOpenBracketSuffix.FindString(lastKeyword)) < 1 {
 		candidateNum := len(candidateKeys)
 		if j, exist := getItem(json, lastKeyword); exist && (confirm || candidateNum == 1) {
 			json = j
@@ -541,8 +547,7 @@ func getItem(json *simplejson.Json, s string) (*simplejson.Json, bool) {
 	var result *simplejson.Json
 	var exist bool
 
-	re := regexp.MustCompile(`\[([0-9]+)\]`)
-	matches := re.FindStringSubmatch(s)
+	matches := reArrayIndex.FindStringSubmatch(s)
 
 	if s == "" {
 		return json, false
