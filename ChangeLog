@@ -1,6 +1,20 @@
 ChangeLog
 =======
 
+### 1.2.0 - Aug 1 2026
+
+Performance:
+* Precompiled all hot-path regexes (query validation, keyword parsing, JMESPath
+  detection, suggestion matching) that were previously recompiled on every keystroke
+* Memoized `GetFilteredData`/`GetPretty` and JMESPath expression evaluation so
+  repeated frames (scrolling, candidate cycling, cursor moves) with an unchanged
+  query skip re-filtering and re-marshaling entirely
+* Cached formatted terminal cells across unchanged frames, avoiding a full
+  re-colorization pass of the document on every redraw
+* Reduced allocations in suggestion key generation, cell rendering, and candidate
+  key highlighting
+* Key mode (`Ctrl+L`) no longer pretty-prints the filtered JSON it doesn't display
+
 ### 1.1.2 - Apr 12 2026
 
 Features:
