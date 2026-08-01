@@ -54,6 +54,9 @@ type Engine struct {
 	cfg        Config
 	// candidate key highlighting / auto-scroll
 	candidateScrollNeeded bool
+	// raw pretty string the current contents were split from ("" in keymode);
+	// passed to the terminal so it can skip re-joining the rows
+	contentsRaw string
 	// quit requested via quit keybinding
 	quitRequested bool
 }
@@ -188,6 +191,7 @@ func (e *Engine) Run() EngineResultInterface {
 		ta := &TerminalDrawAttributes{
 			Query:                  e.query.StringGet(),
 			Contents:               contents,
+			ContentsRaw:            e.contentsRaw,
 			CandidateIndex:         e.candidateidx,
 			ContentsOffsetY:        e.contentOffset,
 			Complete:               e.complete[0],
@@ -296,22 +300,23 @@ func (e *Engine) Run() EngineResultInterface {
 			}
 		case termbox.EventError:
 			panic(ev.Err)
-			break
 		default:
 		}
 	}
 }
 
 func (e *Engine) getContents() []string {
-	var c string
-	var contents []string
-	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
 	if e.keymode {
-		contents = e.candidates
-	} else {
-		contents = strings.Split(c, "\n")
+		// Key mode only displays the candidates; skip pretty-printing the
+		// filtered JSON (its output was discarded here anyway).
+		_, e.complete, e.candidates, _ = e.manager.GetFilteredData(e.query, e.queryConfirm)
+		e.contentsRaw = ""
+		return e.candidates
 	}
-	return contents
+	var c string
+	c, e.complete, e.candidates, _ = e.manager.GetPretty(e.query, e.queryConfirm)
+	e.contentsRaw = c
+	return strings.Split(c, "\n")
 }
 
 func (e *Engine) setCandidateData() {
@@ -743,10 +748,6 @@ func (e *Engine) moveCursorForward() {
 	}
 }
 
-func (e *Engine) moveCursorWordBackwark() {
-}
-func (e *Engine) moveCursorWordForward() {
-}
 func (e *Engine) moveCursorToTop() {
 	e.clearPlaceholder()
 	e.queryCursorIdx = 0

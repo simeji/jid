@@ -3,8 +3,8 @@ package jid
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	runewidth "github.com/mattn/go-runewidth"
 	termbox "github.com/nsf/termbox-go"
@@ -17,19 +17,29 @@ type Terminal struct {
 	formatter  *jsoncolor.Formatter
 	monochrome bool
 	outputArea *[][]termbox.Cell
+	// Formatted-cell cache: colorizing the whole document dominates frame
+	// cost, and scrolling / candidate cycling redraws identical content.
+	// Rows in lastCells are never mutated (highlightCandidateKey is
+	// copy-on-write), so only the outer slice needs copying per frame.
+	lastCellsKey string
+	lastCells    [][]termbox.Cell
+	lastCellsOK  bool
 }
 
 type TerminalDrawAttributes struct {
-	Query             string
-	Contents          []string
-	CandidateIndex    int
-	ContentsOffsetY   int
-	Complete          string
-	Candidates        []string
-	CursorOffset      int
-	FuncHelp          string
-	PlaceholderStart  int // rune index in Query; -1 if no placeholder
-	PlaceholderLen    int
+	Query    string
+	Contents []string
+	// ContentsRaw, when non-empty, is the exact string Contents was split
+	// from — lets rowsToCells skip re-joining the rows.
+	ContentsRaw             string
+	CandidateIndex          int
+	ContentsOffsetY         int
+	Complete                string
+	Candidates              []string
+	CursorOffset            int
+	FuncHelp                string
+	PlaceholderStart        int // rune index in Query; -1 if no placeholder
+	PlaceholderLen          int
 	SelectedCandidate       string // field name to highlight in JSON; "" if none
 	SelectedCandidateIndent int    // indentation level of the target key
 }
@@ -76,7 +86,7 @@ func (t *Terminal) Draw(attr *TerminalDrawAttributes) error {
 		y++
 	}
 
-	cellsArr, err := t.rowsToCells(rows)
+	cellsArr, err := t.rowsToCells(rows, attr.ContentsRaw)
 	if err != nil {
 		return err
 	}
@@ -219,21 +229,32 @@ func (t *Terminal) initColorizeFormatter() *jsoncolor.Formatter {
 	return formatter
 }
 
-func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
-	*t.outputArea = [][]termbox.Cell{[]termbox.Cell{}}
+// rowsToCells converts display rows to termbox cells. raw, when non-empty,
+// must equal strings.Join(rows, "\n") and avoids rebuilding that string.
+func (t *Terminal) rowsToCells(rows []string, raw string) ([][]termbox.Cell, error) {
+	if raw == "" {
+		raw = strings.Join(rows, "\n")
+	}
+	if t.lastCellsOK && raw == t.lastCellsKey {
+		// The caller replaces rows with highlighted copies, so hand out a
+		// fresh outer slice; the row slices themselves are read-only.
+		return append([][]termbox.Cell(nil), t.lastCells...), nil
+	}
+
+	*t.outputArea = [][]termbox.Cell{{}}
 
 	var err error
 
 	if t.formatter != nil {
-		err = t.formatter.Format(io.Discard, []byte(strings.Join(rows, "\n")))
+		err = t.formatter.Format(io.Discard, []byte(raw))
 	}
 
 	cells := *t.outputArea
 
 	if err != nil || t.monochrome {
-		cells = [][]termbox.Cell{}
+		cells = make([][]termbox.Cell, 0, len(rows))
 		for _, row := range rows {
-			var cls []termbox.Cell
+			cls := make([]termbox.Cell, 0, len(row))
 			for _, char := range row {
 				cls = append(cls, termbox.Cell{
 					Ch: char,
@@ -244,6 +265,10 @@ func (t *Terminal) rowsToCells(rows []string) ([][]termbox.Cell, error) {
 			cells = append(cells, cls)
 		}
 	}
+
+	t.lastCellsKey = raw
+	t.lastCells = append([][]termbox.Cell(nil), cells...)
+	t.lastCellsOK = true
 
 	return cells, nil
 }
@@ -262,26 +287,13 @@ func (t *Terminal) drawCells(x int, y int, cells []termbox.Cell) {
 	}
 }
 
-func (t *Terminal) drawFuncHelp(x int, y int, help string) {
-	fg := termbox.ColorYellow
-	bg := termbox.ColorDefault
-	i := 0
-	for _, ch := range help {
-		termbox.SetCell(x+i, y, ch, fg, bg)
-		w := runewidth.RuneWidth(ch)
-		if w == 0 || w == 2 && runewidth.IsAmbiguousWidth(ch) {
-			w = 1
-		}
-		i += w
-	}
-}
-
 // highlightCandidateKey highlights the JSON key matching `key` in a row of cells
 // by applying a yellow background, but only when the key's indentation equals
 // targetIndent. This prevents nested keys with the same name from being highlighted.
 // Returns the original slice if the key is not found or is at the wrong indent.
 func highlightCandidateKey(cells []termbox.Cell, key string, targetIndent int) []termbox.Cell {
 	var sb strings.Builder
+	sb.Grow(len(cells))
 	for _, c := range cells {
 		sb.WriteRune(c.Ch)
 	}
@@ -303,8 +315,8 @@ func highlightCandidateKey(cells []termbox.Cell, key string, targetIndent int) [
 	}
 	result := make([]termbox.Cell, len(cells))
 	copy(result, cells)
-	runeStart := len([]rune(rowStr[:idx]))
-	patternRuneLen := len([]rune(pattern))
+	runeStart := utf8.RuneCountInString(rowStr[:idx])
+	patternRuneLen := utf8.RuneCountInString(pattern)
 	for i := runeStart; i < runeStart+patternRuneLen && i < len(result); i++ {
 		result[i].Fg = termbox.ColorBlack
 		result[i].Bg = termbox.ColorYellow
@@ -319,7 +331,9 @@ func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) 
 	w, _ := termbox.Size()
 
 	ss := candidates[index]
-	re := regexp.MustCompile("[[:space:]]" + regexp.QuoteMeta(ss) + "[[:space:]]")
+	// Rows are built below with plain " " separators, so matching the selected
+	// candidate surrounded by spaces needs no regex.
+	needle := " " + ss + " "
 
 	var rows []string
 	var str string
@@ -334,7 +348,10 @@ func (t *Terminal) drawCandidates(x int, y int, index int, candidates []string) 
 	rows = append(rows, str+" ")
 
 	for i, row := range rows {
-		match := re.FindStringIndex(row)
+		var match []int
+		if idx := strings.Index(row, needle); idx >= 0 {
+			match = []int{idx, idx + len(needle)}
+		}
 		var c termbox.Attribute
 		ii := 0
 		for k, s := range row {

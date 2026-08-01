@@ -8,6 +8,10 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 )
 
+// reIndexKeyword matches an array-index keyword like "[0]", "[", or "[]".
+// Compiled once at package init; Suggestion.Get runs on every keystroke.
+var reIndexKeyword = regexp.MustCompile(`\[([0-9]+)?\]?`)
+
 type SuggestionInterface interface {
 	Get(json *simplejson.Json, keyword string) []string
 	GetCandidateKeys(json *simplejson.Json, keyword string) []string
@@ -135,7 +139,7 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 
 	if a, err := json.Array(); err == nil {
 		if len(a) > 1 {
-			kw := regexp.MustCompile(`\[([0-9]+)?\]?`).FindString(keyword)
+			kw := reIndexKeyword.FindString(keyword)
 			if kw == "" {
 				return []string{"[", "["}
 			} else if kw == "[" {
@@ -179,7 +183,7 @@ func (s *Suggestion) Get(json *simplejson.Json, keyword string) []string {
 			suggestion = suggestion[0 : max+1]
 		}
 	}
-	if reg, err := regexp.Compile("(?i)^" + keyword); err == nil {
+	if reg, err := compileCached("(?i)^" + keyword); err == nil {
 		completion = reg.ReplaceAllString(suggestion, "")
 	}
 	return []string{completion, suggestion}
@@ -196,7 +200,7 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 		return getCurrentKeys(json)
 	}
 
-	reg, err := regexp.Compile(`(?i)^(\\")?` + keyword + `(\\")?`)
+	reg, err := compileCached(`(?i)^(\\")?` + keyword + `(\\")?`)
 	if err != nil {
 		return []string{}
 	}
@@ -209,31 +213,24 @@ func (s *Suggestion) GetCandidateKeys(json *simplejson.Json, keyword string) []s
 }
 
 func getCurrentKeys(json *simplejson.Json) []string {
-
-	kk := []string{}
 	m, err := json.Map()
 
 	if err != nil {
-		return kk
+		return []string{}
 	}
+	kk := make([]string, 0, len(m))
 	for k := range m {
 		kk = append(kk, k)
 	}
+	// Sort raw keys first, then escape in place: candidate ordering is
+	// defined on the unescaped key names.
 	sort.Strings(kk)
-
-	keys := []string{}
-	for _, k := range kk {
+	for i, k := range kk {
 		if strings.Contains(k, ".") {
-			var sb strings.Builder
-			sb.Grow(len(k) + 4)
-			sb.WriteString(`\"`)
-			sb.WriteString(k)
-			sb.WriteString(`\"`)
-			k = sb.String()
+			kk[i] = `\"` + k + `\"`
 		}
-		keys = append(keys, k)
 	}
-	return keys
+	return kk
 }
 
 // jmespathFunctionsByType maps the primary input type to the subset of functions
@@ -290,7 +287,7 @@ func (s *Suggestion) GetFunctionCandidatesFiltered(prefix string, t SuggestionDa
 		}
 		return out
 	}
-	reg, err := regexp.Compile(`(?i)^` + regexp.QuoteMeta(prefix))
+	reg, err := compileCached(`(?i)^` + regexp.QuoteMeta(prefix))
 	if err != nil {
 		return []string{}
 	}
@@ -343,7 +340,7 @@ func (s *Suggestion) GetFunctionSuggestionFiltered(prefix string, t SuggestionDa
 		return []string{"", ""}
 	}
 	// completion is the remaining characters after what has been typed
-	reg, err := regexp.Compile(`(?i)^` + regexp.QuoteMeta(prefix))
+	reg, err := compileCached(`(?i)^` + regexp.QuoteMeta(prefix))
 	if err != nil {
 		return []string{"", ""}
 	}
