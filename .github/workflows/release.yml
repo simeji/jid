@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -22,3 +25,14 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: VirusTotal Scan
+        if: env.VT_API_KEY != ''
+        uses: cssnr/virustotal-action@v2
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_id: ${{ github.ref_name }}
+          file_globs: |
+            dist/*.zip
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
